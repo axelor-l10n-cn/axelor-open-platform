@@ -506,7 +506,14 @@ function DMSFileListCtrl($scope, $element, NavService) {
       if (batchId) {
         ui.download("ws/dms/download/" + batchId, batchName);
       }
-    });
+    }, function (e) {
+      if (e.status == 404) {
+        var fname = records.length === 1 ?
+          '<strong>' + axelor.sanitize(_.first(records).fileName) + '</strong>' : '';
+        axelor.notify.error("<p>" + _t("File {0} does not exist.", fname) + "</p>");
+      }
+    }
+    );
   };
 
   $scope.onOffline = function () {
@@ -1359,8 +1366,8 @@ ui.directive("uiDmsDetails", function () {
           info.type = record.isDirectory ? _t("Directory") : record.fileType || _t("Unknown");
           info.tags = record.tags;
           info.owner = getUserName(record.createdBy);
-          info.created = moment(record.createdOn).format('DD/MM/YYYY HH:mm');
-          info.updated = moment(record.updatedOn || record.createdOn).format('DD/MM/YYYY HH:mm');
+          info.created = moment(record.createdOn).format(ui.dateTimeFormat);
+          info.updated = moment(record.updatedOn || record.createdOn).format(ui.dateTimeFormat);
           info.canOffline = !record.isDirectory && (record.metaFile || record['metaFile.id']);
           info.offline = record.offline;
         }
@@ -1759,7 +1766,6 @@ ui.download = function download(url, fileName) {
 
   function doDownload() {
     var link = document.createElement('a');
-    var name = axelor.sanitize(fileName);
 
     link.innerHTML = name;
     link.download = name;
@@ -1783,9 +1789,11 @@ ui.download = function download(url, fileName) {
       link.click();
     }, 100);
 
-    axelor.notify.info(_t("Downloading {0}...", name));
+    var fname = "<strong>" + name + "</strong>";
+    axelor.notify.info(_t("Downloading {0}...", fname));
   }
 
+  var name = axelor.sanitize(fileName);
   $.ajax({
     url : url,
     type : 'HEAD',

@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <object-views xmlns="http://axelor.com/xml/ns/object-views"
   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-  xsi:schemaLocation="http://axelor.com/xml/ns/object-views http://axelor.com/xml/ns/object-views/object-views_5.3.xsd">
+  xsi:schemaLocation="http://axelor.com/xml/ns/object-views http://axelor.com/xml/ns/object-views/object-views_5.4.xsd">
 
   <menuitem name="menu-admin" title="Administration" order="100" groups="admins" icon="fa-wrench" icon-background="red" />
   <menuitem name="menu-auth" parent="menu-admin" title="User Management" />
@@ -144,6 +144,15 @@
     <view type="grid" name="meta-help-menu-grid"/>
     <view type="form" name="meta-help-menu-form"/>
     <domain>self.menu is not null</domain>
+  </action-view>
+
+  <menuitem name="menu-meta-attrs" parent="menu-view-management"
+    title="View Attributes"
+    action="action-meta-attrs" />
+
+  <action-view name="action-meta-attrs" title="View Attributes" model="com.axelor.meta.db.MetaAttrs">
+    <view type="grid" name="meta-attrs-grid"/>
+    <view type="form" name="meta-attrs-form"/>
   </action-view>
 
   <menuitem name="menu-view-charts" parent="menu-view-management"

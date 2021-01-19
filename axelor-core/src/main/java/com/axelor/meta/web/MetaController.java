@@ -19,6 +19,8 @@ package com.axelor.meta.web;
 
 import com.axelor.app.AppSettings;
 import com.axelor.app.AvailableAppSettings;
+import com.axelor.auth.AuthUtils;
+import com.axelor.auth.db.User;
 import com.axelor.common.StringUtils;
 import com.axelor.db.mapper.Mapper;
 import com.axelor.db.mapper.Property;
@@ -28,11 +30,13 @@ import com.axelor.inject.Beans;
 import com.axelor.meta.MetaScanner;
 import com.axelor.meta.MetaStore;
 import com.axelor.meta.db.MetaAction;
+import com.axelor.meta.db.MetaAttrs;
 import com.axelor.meta.db.MetaField;
 import com.axelor.meta.db.MetaJsonField;
 import com.axelor.meta.db.MetaModel;
 import com.axelor.meta.db.MetaTranslation;
 import com.axelor.meta.db.MetaView;
+import com.axelor.meta.db.repo.MetaAttrsRepository;
 import com.axelor.meta.db.repo.MetaTranslationRepository;
 import com.axelor.meta.loader.ModuleManager;
 import com.axelor.meta.loader.XMLViews;
@@ -42,6 +46,8 @@ import com.axelor.meta.schema.actions.ActionView;
 import com.axelor.meta.service.MetaService;
 import com.axelor.rpc.ActionRequest;
 import com.axelor.rpc.ActionResponse;
+import com.axelor.rpc.Context;
+import com.axelor.script.ScriptHelper;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Maps;
 import com.google.common.io.Files;
@@ -57,6 +63,7 @@ import java.nio.file.Paths;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalTime;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -121,6 +128,49 @@ public class MetaController {
     }
 
     response.setData(ImmutableList.of(data));
+  }
+
+  private List<MetaAttrs> findAttrs(String model, String view) {
+    String filter =
+        StringUtils.isBlank(view)
+            ? "self.model = :model and self.view is null"
+            : "self.model = :model and self.view = :view";
+    MetaAttrsRepository repo = Beans.get(MetaAttrsRepository.class);
+    return repo.all().filter(filter).bind("model", model).bind("view", view).order("order").fetch();
+  }
+
+  public void moreAttrs(ActionRequest request, ActionResponse response) {
+    Context ctx = request.getContext();
+    String model = (String) ctx.get("_model");
+    String view = (String) ctx.get("_viewName");
+
+    User user = AuthUtils.getUser();
+    ScriptHelper sh = request.getScriptHelper();
+    List<MetaAttrs> attrs = new ArrayList<>(findAttrs(model, null));
+
+    if (StringUtils.notBlank(view)) {
+      attrs.addAll(findAttrs(model, view));
+    }
+
+    attrs.stream()
+        // check roles
+        .filter(
+            attr ->
+                attr.getRoles() == null
+                    || attr.getRoles().isEmpty()
+                    || attr.getRoles().stream()
+                        .anyMatch(role -> AuthUtils.hasRole(user, role.getName())))
+        // check conditions
+        .filter(attr -> sh.test(attr.getCondition()))
+        // set attrs
+        .forEach(
+            attr -> {
+              final Object value =
+                  attr.getName().matches("readonly|required|recommend|hidden|collapse")
+                      ? sh.test(attr.getValue())
+                      : sh.eval(attr.getValue());
+              response.setAttr(attr.getField(), attr.getName(), value);
+            });
   }
 
   /** This action is called from custom fields form when context field is changed. */
@@ -191,12 +241,13 @@ public class MetaController {
       MetaStore.clear();
       I18nBundle.invalidate();
       final Duration duration = Duration.between(startInstant, Instant.now());
-      final LocalTime durationTime = LocalTime.MIN.plusSeconds(duration.getSeconds());
+      final String durationTime =
+          LocalTime.MIN.plusSeconds(duration.getSeconds()).format(DateTimeFormatter.ISO_LOCAL_TIME);
       response.setNotify(
           String.format(I18n.get("All views have been restored (%s)."), durationTime)
               + "<br>"
               + I18n.get("Please refresh your browser to see updated views."));
-      log.info("Restore meta time: {}", LocalTime.MIN.plusSeconds(duration.getSeconds()));
+      log.info("Restore meta time: {}", durationTime);
     } catch (Exception e) {
       response.setException(e);
     }

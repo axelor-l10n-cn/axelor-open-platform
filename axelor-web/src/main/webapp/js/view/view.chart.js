@@ -43,12 +43,7 @@ function ChartCtrl($scope, $element, $http, ActionService) {
   var loading = false;
   var unwatch = null;
 
-  function refresh() {
-
-    if (viewChart && searchScope && $scope.searchFields && !searchScope.isValid()) {
-      return;
-    }
-
+  function prepareContext() {
     var context = $scope._context || {};
     if ($scope.getContext) {
       context = _.extend({}, $scope.getContext(), context);
@@ -58,11 +53,19 @@ function ChartCtrl($scope, $element, $http, ActionService) {
       context = _.extend({}, context, searchScope.getContext());
     }
 
-    context = _.extend({}, context, { _domainAction: $scope._viewAction });
+    return _.extend({}, context, { _domainAction: $scope._viewAction });
+  }
+
+  function refresh() {
+
+    if (viewChart && searchScope && $scope.searchFields && !searchScope.isValid()) {
+      return;
+    }
+
     loading = true;
 
     var params = {
-      data: context
+      data: prepareContext()
     };
 
     if (viewChart) {
@@ -120,7 +123,7 @@ function ChartCtrl($scope, $element, $http, ActionService) {
   $scope.handleAction = function (data) {
     if (actionHandler) {
       actionHandler._getContext = function () {
-        return _.extend({}, { _data: data }, {
+        return _.extend({}, prepareContext(), { _data: data }, {
           _model: $scope._model || 'com.axelor.meta.db.MetaView',
           _chart: view.name
         });
@@ -132,7 +135,7 @@ function ChartCtrl($scope, $element, $http, ActionService) {
   $scope.handleClick = function (e) {
     if (clickHandler) {
       clickHandler._getContext = function () {
-        return _.extend({}, e.data.raw, {
+        return _.extend({}, prepareContext(), e.data.raw, {
           _model: $scope._model || 'com.axelor.meta.db.MetaView',
           _chart: view.name
         });
@@ -408,7 +411,7 @@ function PlotData(series, data) {
     var name = groupBy ? groupName : null;
     var values = _.map(group, function (item) {
       var x = $conv(item[data.xAxis], data.xType) || 0;
-      var y = $conv(item[series.key] || name || 0);
+      var y = $conv(item[series.key] !== undefined ? item[series.key] : name || 0);
       return { x: x, y: y, raw: item };
     });
 
@@ -463,6 +466,21 @@ function applyLimitsOnLegendAndLabels(chart, scope, series, datum, config) {
       && (!chart.staggerLabels || !chart.staggerLabels())
       && _.chain(datum).pluck("values").flatten().pluck("x").unique().size().value() > labelRotateLimit) {
     chart.xAxis.rotateLabels(-45);
+  }
+}
+
+function applyTitles(chart, xTitle, yTitle) {
+  if (xTitle && chart.xAxis && chart.xAxis.axisLabel) {
+    var minMargin = 60;
+    if (chart.staggerLabels && chart.staggerLabels() && chart.margin().bottom < minMargin) {
+      chart.margin().bottom = minMargin;
+    }
+    chart.xAxis.axisLabel(xTitle);
+  }
+  if (yTitle && chart.yAxis && chart.yAxis.axisLabel) {
+    chart.yAxis.axisLabel(yTitle);
+    chart.yAxis.axisLabelDistance(15);
+    chart.margin().left = 80;
   }
 }
 
@@ -522,6 +540,7 @@ function DBarChart(scope, element, data) {
       .staggerLabels(true)
       .showValues(true);
   applyLimitsOnLegendAndLabels(chart, scope, series, datum, config);
+  applyTitles(chart, data.xTitle, series.title);
 
   d3.select(element[0])
     .datum(datum)
@@ -543,6 +562,7 @@ function BarChart(scope, element, data) {
   var chart = nv.models.multiBarChart()
     .reduceXTicks(false);
   applyLimitsOnLegendAndLabels(chart, scope, series, datum, config);
+  applyTitles(chart, data.xTitle, series.title);
 
   chart.multibar.hideable(true);
   chart.stacked(data.stacked);
@@ -566,6 +586,7 @@ function HBarChart(scope, element, data) {
 
   var chart = nv.models.multiBarHorizontalChart();
   applyLimitsOnLegendAndLabels(chart, scope, series, datum, config);
+  applyTitles(chart, data.xTitle, series.title);
 
   chart.stacked(data.stacked);
 
@@ -580,10 +601,25 @@ function HBarChart(scope, element, data) {
   return chart;
 }
 
-function FunnelChart(scope, element, data) {
+function FunnelChart(scope, element, data, valueFormatter) {
 
   if(!data.dataset){
     return;
+  }
+
+  if (_.isEmpty(data.dataset)) {
+    return {
+      "noData": function(value) {
+        var svg = d3.select(element.empty()[0]);
+        svg.append("svg:text")
+        .attr("x", "50%")
+        .attr("y", "50%")
+        .attr("dy", ".3em")
+          .attr("text-anchor", "middle")
+        .text(value);
+      },
+      "update": function() {}
+    };
   }
 
   var chart = new D3Funnel(element[0]);
@@ -594,7 +630,9 @@ function FunnelChart(scope, element, data) {
       fillType: 'gradient',
       hoverEffects: true,
       dynamicArea: true,
-      animation: 200};
+      animation: 200,
+      valueFormatter: valueFormatter
+  };
 
   if(config.width){
     props.width = w*config.width/100;
@@ -631,7 +669,7 @@ function LineChart(scope, element, data) {
     .showYAxis(true)
     .showXAxis(true);
   applyLimitsOnLegend(chart, scope, series, datum, config);
-
+  applyTitles(chart, data.xTitle, series.title);
   applyXY(chart, data);
 
   d3.select(element[0])
@@ -649,7 +687,7 @@ function AreaChart(scope, element, data) {
 
   var chart = nv.models.stackedAreaChart();
   applyLimitsOnLegend(chart, scope, series, datum, config);
-
+  applyTitles(chart, data.xTitle, series.title);
   applyXY(chart, data);
 
   d3.select(element[0])
@@ -815,50 +853,19 @@ function Chart(scope, element, data) {
       data.dataset = [];
     }
 
-    var maker = CHARTS[type] || CHARTS.bar || function () {};
-    var chart = maker(scope, element, data);
-
-    if (!chart) {
-      return;
-    }
-
     // series scale attribute
     var series = _.first(data.series);
     var scale = series && series.scale;
 
-    // format as integer if no scale is specified
-    // and data has integer series values
-    if (!isInteger(scale) && hasIntegerValues(data)) {
-      scale = 0;
-    }
-
-    if (isInteger(scale)) {
-      var format = '.' + scale + 'f';
-      chart.yAxis && chart.yAxis.tickFormat(d3.format(format));
-      chart.valueFormat && chart.valueFormat(d3.format(format));
-    }
-
-    if (chart.color) {
-      chart.color(colors(config.colors, config.shades, type));
-    }
-
-    if (chart.noData) {
-      chart.noData(noData);
-    }
-    if(chart.controlLabels) {
-      chart.controlLabels({
-        grouped: _t('Grouped'),
-        stacked: _t('Stacked'),
-        stream: _t('Stream'),
-        expanded: _t('Expanded'),
-        stack_percent: _t('Stack %')
-      });
+    // set default scale value if no scale is specified
+    if (!isInteger(scale)) {
+      scale = hasIntegerValues(data) ? 0 : 2;
     }
 
     var tickFormats = {
       "date" : function (d) {
-        var f = config.xFormat;
-        return moment(d).format(f || 'YYYY-MM-DD');
+        var f = config.xFormat || ui.dateFormat || 'DD/MM/YYYY';
+        return moment(d).format(f);
       },
       "month" : function(d) {
         var v = "" + d;
@@ -878,10 +885,51 @@ function Chart(scope, element, data) {
       "year" : function(d) {
         return moment([moment().year(), d - 1, 1]).format("YYYY");
       },
-      "number": d3.format(',f'),
-      "decimal": d3.format(',.1f'),
+      "number": function(d) {
+        return ui.formatters.integer({}, d);
+      },
+      "decimal": function(d) {
+        var field = _.extend({}, {
+          scale: scale,
+        });
+        return ui.formatters.decimal(field, d);
+      },
       "text": function(d) { return d; }
     };
+
+    var valueFormatter = scale > 0 ? tickFormats.decimal : tickFormats.number;
+
+    var maker = CHARTS[type] || CHARTS.bar || function () {};
+    var chart = maker(scope, element, data, valueFormatter);
+
+    if (!chart) {
+      return;
+    }
+
+    if (chart.yAxis) {
+      chart.yAxis.tickFormat(valueFormatter);
+    }
+
+    if (chart.valueFormat) {
+      chart.valueFormat(valueFormatter);
+    }
+
+    if (chart.color) {
+      chart.color(colors(config.colors, config.shades, type));
+    }
+
+    if (chart.noData) {
+      chart.noData(noData);
+    }
+    if(chart.controlLabels) {
+      chart.controlLabels({
+        grouped: _t('Grouped'),
+        stacked: _t('Stacked'),
+        stream: _t('Stream'),
+        expanded: _t('Expanded'),
+        stack_percent: _t('Stack %')
+      });
+    }
 
     var tickFormat = tickFormats[data.xType];
     if (chart.xAxis && tickFormat) {

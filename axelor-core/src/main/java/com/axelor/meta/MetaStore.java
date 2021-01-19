@@ -172,7 +172,7 @@ public final class MetaStore {
       if (property.getTarget() != null) {
         map.put("perms", getPermissions(property.getTarget()));
       }
-      if (property.isMassUpdate()) {
+      if (property.isMassUpdate() && !name.contains(".")) {
         massUpdate = true;
       }
       // find the default value
@@ -244,7 +244,7 @@ public final class MetaStore {
       Map<String, Object> fields, String object, String jsonField) {
     final User user = AuthUtils.getUser();
     final MetaPermissions perms = Beans.get(MetaPermissions.class);
-    final Map<String, Object> result = new HashMap<>();
+    final Map<String, Object> result = new LinkedHashMap<>();
 
     for (Map.Entry<String, Object> item : fields.entrySet()) {
       String name = jsonField == null ? item.getKey() : jsonField + "." + item.getKey();
@@ -295,6 +295,7 @@ public final class MetaStore {
             .filter("self.model = :model AND self.modelField = :field")
             .bind("model", modelName)
             .bind("field", fieldName)
+            .order("sequence")
             .order("id")
             .fetch();
 
@@ -593,6 +594,7 @@ public final class MetaStore {
     option.setValue(item.getValue());
     option.setTitle(item.getTitle());
     option.setIcon(item.getIcon());
+    option.setColor(item.getColor());
     option.setOrder(item.getOrder());
     option.setHidden(item.getHidden());
     try {

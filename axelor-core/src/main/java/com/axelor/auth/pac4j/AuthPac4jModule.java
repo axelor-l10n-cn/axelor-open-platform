@@ -35,6 +35,7 @@ import io.buji.pac4j.filter.CallbackFilter;
 import io.buji.pac4j.filter.LogoutFilter;
 import io.buji.pac4j.filter.SecurityFilter;
 import java.io.IOException;
+import java.io.UnsupportedEncodingException;
 import java.lang.invoke.MethodHandles;
 import java.net.URI;
 import java.util.ArrayList;
@@ -79,6 +80,7 @@ import org.pac4j.core.context.Pac4jConstants;
 import org.pac4j.core.context.WebContext;
 import org.pac4j.core.context.session.SessionStore;
 import org.pac4j.core.exception.HttpAction;
+import org.pac4j.core.http.adapter.HttpActionAdapter;
 import org.pac4j.core.http.adapter.J2ENopHttpActionAdapter;
 import org.pac4j.core.profile.CommonProfile;
 import org.pac4j.core.util.CommonHelper;
@@ -275,6 +277,11 @@ public abstract class AuthPac4jModule extends AuthWebModule {
       // don't need csrf check for native clients
       if (isNativeClient(context)) return true;
 
+      addResponseCookieAndHeader(context);
+      return true;
+    }
+
+    private void addResponseCookieAndHeader(WebContext context) {
       final String token = tokenGenerator.get(context);
       final Cookie cookie = new Cookie(CSRF_COOKIE_NAME, token);
 
@@ -286,16 +293,7 @@ public abstract class AuthPac4jModule extends AuthWebModule {
       cookie.setDomain("");
       cookie.setPath(path);
       context.addResponseCookie(cookie);
-
-      return true;
-    }
-
-    public void addResponseCookieAndHeader(WebContext context) {
-      // don't need csrf check for native clients
-      if (!isNativeClient(context)) {
-        isAuthorized(context, null);
-        context.setResponseHeader(CSRF_COOKIE_NAME, tokenGenerator.get(context));
-      }
+      context.setResponseHeader(CSRF_HEADER_NAME, token);
     }
   }
 
@@ -378,12 +376,40 @@ public abstract class AuthPac4jModule extends AuthWebModule {
       setCallbackLogic(
           new ShiroCallbackLogic<Object, J2EContext>() {
 
+            @Override
+            public Object perform(
+                J2EContext context,
+                Config config,
+                HttpActionAdapter<Object, J2EContext> httpActionAdapter,
+                String inputDefaultUrl,
+                Boolean inputSaveInSession,
+                Boolean inputMultiProfile,
+                Boolean inputRenewSession,
+                String client) {
+
+              try {
+                context.getRequest().setCharacterEncoding("UTF-8");
+              } catch (UnsupportedEncodingException e) {
+                logger.error(e.getMessage(), e);
+              }
+
+              return super.perform(
+                  context,
+                  config,
+                  httpActionAdapter,
+                  inputDefaultUrl,
+                  inputSaveInSession,
+                  inputMultiProfile,
+                  inputRenewSession,
+                  client);
+            }
+
             @SuppressWarnings("unchecked")
             @Override
             protected HttpAction redirectToOriginallyRequestedUrl(
                 J2EContext context, String defaultUrl) {
 
-              // Add CSRF token cookie
+              // Add CSRF token cookie and header
               AxelorCsrfTokenGeneratorAuthorizer csrfTokenAuthorizer =
                   (AxelorCsrfTokenGeneratorAuthorizer)
                       config.getAuthorizers().get(CSRF_TOKEN_AUTHORIZER_NAME);
@@ -460,6 +486,8 @@ public abstract class AuthPac4jModule extends AuthWebModule {
 
   private static class AxelorLoginPageFilter implements Filter {
 
+    @Inject private AxelorCallbackFilter axelorCallbackFilter;
+
     @Override
     public void init(javax.servlet.FilterConfig filterConfig) throws ServletException {}
 
@@ -478,7 +506,13 @@ public abstract class AuthPac4jModule extends AuthWebModule {
       if (authenticated
           || AuthPac4jModule.clientList.stream()
               .noneMatch(client -> client instanceof FormClient)) {
-        ((HttpServletResponse) response).sendRedirect(AppSettings.get().getBaseURL());
+        ((HttpServletResponse) response).sendRedirect(".");
+        return;
+      }
+
+      // Perform callback filter if request body is not empty.
+      if (request.getContentLengthLong() > 0L) {
+        axelorCallbackFilter.doFilter(request, response, chain);
         return;
       }
 

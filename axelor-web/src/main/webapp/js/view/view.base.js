@@ -770,21 +770,25 @@ ui.directive('uiViewSwitcherMenu', function(){
 ui.directive('uiHotKeys', function() {
 
   var keys = {
-    45: 'new',		// insert
-    69: 'edit',		// e
-    83: 'save',		// s
-    68: 'delete',	// d
-    82: 'refresh',	// r
-    70: 'search',	// f
-    71: 'select',	// g
-    74: 'prev',		// j
-    75:	'next',		// n
-
-    77: 'focus-menu',		// m
-     120: 'toggle-menu',		// F9
-
-    81: 'close'		// q
-  };
+    '': {
+      120: 'toggle-menu'// F9
+    },
+    'ctrl': {
+      45: 'new',        // insert
+      69: 'edit',       // e
+      83: 'save',       // s
+      68: 'delete',     // d
+      82: 'refresh',    // r
+      74: 'prev',       // j
+      75: 'next',       // k
+      77: 'focus-menu', // m
+      81: 'close'       // q
+    },
+    'alt': {
+      70: 'search',     // f
+      71: 'select',     // g
+    }
+  }
 
   return function(scope, element, attrs) {
 
@@ -802,27 +806,34 @@ ui.directive('uiHotKeys', function() {
         return false;
       }
 
-      var action = keys[e.which];
+      // no shortcuts defined with shift or meta modifiers
+      if (e.shiftKey || e.metaKey) {
+        return;
+      }
+
+      var modifierKeys = '';
+
+      if (e.ctrlKey) {
+        modifierKeys += 'ctrl';
+      }
+
+      if (e.altKey) {
+        modifierKeys += 'alt';
+      }
+
+      var action = (keys[modifierKeys] || {})[e.which];
+
+      if (!action) {
+        return;
+      }
 
       if (action === "toggle-menu") {
         $('#offcanvas-toggle a').click();
         return false;
       }
 
-      if (e.altKey || e.shiftKey || !e.ctrlKey) {
-        return;
-      }
-
       if (action === "focus-menu") {
-        var activeMenu = $('.sidebar .nav-tree li.active');
-        if (activeMenu.length === 0) {
-          activeMenu = $('.sidebar .nav-tree li:first');
-        }
-
-        var navTree = activeMenu.parents('[nav-tree]:first');
-        if (navTree.length) {
-          navTree.navtree('selectItem', activeMenu);
-        }
+        $('.sidebar .nav-search-toggle > i').click();
         return false;
       }
 
@@ -834,7 +845,7 @@ ui.directive('uiHotKeys', function() {
         vs = dlg.scope();
       }
 
-      if (!vs || !keys.hasOwnProperty(e.which)) {
+      if (!vs) {
         return;
       }
 
@@ -846,7 +857,7 @@ ui.directive('uiHotKeys', function() {
       }
 
       if (action === "search") {
-        var filterBox = $('.filter-box .search-query:visible');
+        var filterBox = $('.filter-box :input:visible');
         if (filterBox.length) {
           filterBox.focus().select();
           return false;

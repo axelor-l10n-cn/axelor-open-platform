@@ -231,6 +231,14 @@
   width: 100% !important;
 }
 
+.slick-editor .picker-input.image-select > img,
+.slick-editor .picker-input.image-select > i.fa {
+  padding-left: 6px;
+}
+.slick-editor .picker-input.image-select > input {
+  padding-left: 20px !important;
+}
+
 .slick-editor .ui-spinner {
   border: none;
 }
@@ -269,6 +277,15 @@
 
 .slick-editor .form-item-container > .ibox {
   margin: 2px 3px !important;
+  width: auto;
+}
+
+.slick-editor .form-item-container > .ibox > input {
+  margin-left: 0 !important;
+  width: 20px !important;
+  height: 20px !important;
+  min-height: auto !important;
+  z-index: 1;
 }
 
 .slick-editor-dropdown {
@@ -285,6 +302,36 @@
 .ui-dialog .slick-editor-dropdown .slickgrid {
   position: relative;
   top: 0; right: 0; border: 0; left: 0;
+}
+
+.slick-editor-dropdown.textarea {
+  display: 'flex';
+  flex-direction: column;
+  min-width: inherit;
+}
+
+.slick-editor-dropdown.textarea textarea {
+  flex: 1;
+  margin: 0;
+}
+
+.slick-editor-dropdown.textarea.html {
+  min-height: 147px;
+}
+
+.slick-editor-dropdown .wysiwyg-container {
+  background: white;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-flow: column;
+}
+
+.slick-editor-dropdown .wysiwyg-editor {
+  height: 100%;
+  overflow: scroll;
+  overflow-x: hidden;
+  flex: 1;
 }
 
 .slickgrid-editable .slick-row.active .slick-cell-editable.dirty:before,
@@ -309,10 +356,15 @@
   cursor: pointer;
 }
 
-.slick-cell.button .disabled {
+.slick-cell.button .disabled,
+.slick-editor .form-item-container.button-item.disabled {
   outline: none;
   opacity: 0.45;
   cursor: inherit;
+}
+
+.slick-editor .form-item-container.button-item:hover {
+  text-decoration: none;
 }
 
 .slick-cell.button,
@@ -334,6 +386,7 @@
   margin-top: 2px !important;
 }
 
+.slick-group > .slick-cell,
 .slick-group > .slick-cell-checkboxsel {
    text-align: inherit;
 }
@@ -564,6 +617,13 @@
   flex: 1;
 }
 
+.slick-editor .form-item-container pre {
+  height: 24px;
+  line-height: 24px;
+  overflow: hidden;
+  padding-top: 0px;
+}
+
 .slick-editor .form-item-container.readonly,
 .slick-editor .form-item-container.readonly > span.display-text {
   background-color: #e7e7e7;
@@ -573,7 +633,16 @@
   display: flex;
   flex-direction: column;
   align-items: center;
+  justify-content: center;
   background: transparent;
+}
+
+.slick-editor .form-item-container.button-item > i {
+  flex: unset;
+}
+
+.slick-editor .form-item-container.button-item > .btn-text {
+  flex: 0;
 }
 
 .slick-editor .form-item-container.button-item i.fa {

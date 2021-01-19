@@ -78,7 +78,14 @@ ui.prepareContext = function(model, values, dummyValues, parentContext) {
   // use selected flag for o2m/m2m fields
   // see onSelectionChanged in o2m controller
   _.each(context.$many, function (getItems, name) {
-    if (!getItems) return;
+    if (!getItems) {
+      // no items selected
+      context[name] = _.map(context[name], function (item) {
+        if (item.selected) item = _.extend({}, item, {selected: false});
+        return item;
+      });
+      return;
+    }
     if (name.indexOf('$') === 0) name = name.substring(1);
     var items = getItems();
     var value = context[name] || [];
@@ -208,11 +215,17 @@ function FormViewCtrl($scope, $element) {
       }
     }
 
-    var page = ds.page(),
-      record = null;
+    var record = null;
 
-    if (page.index > -1) {
-      record = ds.at(page.index);
+    if (ds._record) {
+      record = ds._record;
+      delete ds._record;
+    } else {
+      var page = ds.page();
+
+      if (page.index > -1) {
+        record = ds.at(page.index);
+      }
     }
 
     routeId = record && record.id > 0 ? record.id : null;
@@ -381,7 +394,7 @@ function FormViewCtrl($scope, $element) {
         $scope.ajaxStop(function(){
           var handler = $scope.$events.onLoad,
             record = $scope.record;
-          if (handler && !ds.equals({}, record)) {
+          if (handler && !ds.equals({}, record) && record.id) {
             setTimeout(handler);
           }
         });
@@ -415,9 +428,13 @@ function FormViewCtrl($scope, $element) {
     });
   };
 
+  $scope.getContextRecord = function() {
+    return _.extend({}, $scope._routeSearch, $scope.record);
+  };
+
   $scope.getContext = function() {
     var dummy = $scope.getDummyValues();
-    var context = _.extend({}, $scope._routeSearch, $scope.record);
+    var context = $scope.getContextRecord();
     if ($scope.$parent && $scope.$parent.getContext) {
       context._parent = $scope.$parent.getContext();
     } else {
@@ -737,6 +754,33 @@ function FormViewCtrl($scope, $element) {
     return _.pick($scope.record, extra);
   };
 
+  $scope._gridEditCount = 0;
+  $scope._afterGridEditTasks = [];
+
+  $scope.$on('on:grid-edit-start', function () {
+    ++$scope._gridEditCount;
+  });
+
+  $scope.$on('on:grid-edit-end', function () {
+    if (!--$scope._gridEditCount) {
+      try {
+        _.each($scope._afterGridEditTasks, function (task) {
+          task();
+        });
+      } finally {
+        $scope._afterGridEditTasks = [];
+      }
+    }
+  });
+
+  $scope.afterGridEdit = function (task) {
+    if ($scope._gridEditCount) {
+      $scope._afterGridEditTasks.push(task);
+    } else {
+      task();
+    }
+  };
+
   $scope.onSave = function(options) {
 
     var opts = _.extend({ fireOnLoad: true }, options);
@@ -779,6 +823,16 @@ function FormViewCtrl($scope, $element) {
       });
 
       promise.success(function(record) {
+        // update dotted fields with new values from form
+        _.chain(Object.keys(record).concat(Object.keys($scope.fields)))
+          .filter(function(name) { return name.indexOf('.') >= 0; })
+          .uniq()
+          .each(function(name) {
+            var value = ui.findNested(values, name);
+            if (value !== undefined) {
+              record[name] = value;
+            }
+          });
         defer.resolve(record);
       });
       promise.error(function(error) {
@@ -808,7 +862,7 @@ function FormViewCtrl($scope, $element) {
       }
     }
 
-    waitForActions(doOnSave);
+    $scope.afterGridEdit(function () { waitForActions(doOnSave); });
 
     return defer.promise;
   };
@@ -898,6 +952,7 @@ function FormViewCtrl($scope, $element) {
   };
 
   $scope.reload = function() {
+    $scope.$broadcast("on:attrs-reset");
     var record = $scope.record;
     if (record && record.id) {
       return doEdit(record.id).success(function (rec) {
@@ -991,7 +1046,10 @@ function FormViewCtrl($scope, $element) {
   $scope.onNext = function() {
     $scope.confirmDirty(function() {
       ds.nextItem(function(record){
-        if (record && record.id) doEdit(record.id);
+        if (record && record.id) {
+          $scope.$broadcast("on:attrs-reset");
+          doEdit(record.id);
+        }
       });
     });
   };
@@ -999,7 +1057,10 @@ function FormViewCtrl($scope, $element) {
   $scope.onPrev = function() {
     $scope.confirmDirty(function() {
       ds.prevItem(function(record){
-        if (record && record.id) doEdit(record.id);
+        if (record && record.id) {
+          $scope.$broadcast("on:attrs-reset");
+          doEdit(record.id);
+        }
       });
     });
   };
@@ -1032,11 +1093,11 @@ function FormViewCtrl($scope, $element) {
 
     var info = {};
     if (record.createdOn) {
-      info.createdOn = moment(record.createdOn).format('DD/MM/YYYY HH:mm');
+      info.createdOn = moment(record.createdOn).format(ui.dateTimeFormat);
       info.createdBy = nameOf(record.createdBy);
     }
     if (record.updatedOn) {
-      info.updatedOn = moment(record.updatedOn).format('DD/MM/YYYY HH:mm');
+      info.updatedOn = moment(record.updatedOn).format(ui.dateTimeFormat);
       info.updatedBy = nameOf(record.updatedBy);
     }
     var table = $("<table class='table field-details'>");
@@ -1113,6 +1174,16 @@ function FormViewCtrl($scope, $element) {
         $scope.onUnarchive();
       },
     }, {
+      visible: function () {
+        return ($scope.record || {}).$processInstanceId;
+      }
+    }, {
+      title: _t('Display process'),
+      visible: function () {
+        return ($scope.record || {}).$processInstanceId;
+      },
+      action: "wkf-instance-view-from-record"
+    }, {
     }, {
       active: function () {
         return $scope.hasAuditLog();
@@ -1144,6 +1215,9 @@ function FormViewCtrl($scope, $element) {
       }
       focusFirst();
     }
+    if (action === "delete" && $scope.canDelete()) {
+      $scope.onDelete();
+    }
     if (action === "select") {
       focusFirst();
     }
@@ -1155,6 +1229,13 @@ function FormViewCtrl($scope, $element) {
     }
     if (action === "search") {
       $scope.onBack();
+      $scope.waitForActions(function () {
+        var filterBox = $('.filter-box :input:visible');
+        if (filterBox.length) {
+          filterBox.focus().select();
+          return false;
+        }
+      }, 300);
     }
 
     $scope.$applyAsync();
@@ -1179,6 +1260,7 @@ ui.formBuild = function (scope, schema, fields) {
 
   var path = scope.formPath || "";
   var hasPanels = false;
+  var hasToolTipField = false;
 
   function update(e, attrs) {
     _.each(attrs, function(v, k) {
@@ -1305,6 +1387,11 @@ ui.formBuild = function (scope, schema, fields) {
         _attrs['x-path'] = path ? path + "." + _attrs.name : _attrs.name;
       }
 
+      if (attrs.tooltip) {
+        hasToolTipField = true;
+        item.addClass('has-tooltip');
+      }
+
       update(item, _attrs);
 
       // enable actions & conditional expressions
@@ -1354,6 +1441,10 @@ ui.formBuild = function (scope, schema, fields) {
     elem.removeAttr('ui-table-layout').attr('ui-bar-layout', '');
   }
 
+  if (hasToolTipField) {
+    $("<div ui-tooltip selector='.form-item-container.has-tooltip' getter='getToolTip($event)'>").appendTo(elem);
+  }
+
   return elem;
 };
 
@@ -1380,6 +1471,29 @@ ui.directive('uiViewForm', ['$compile', 'ViewService', function($compile, ViewSe
     };
 
     var translatted = null;
+
+    scope.getToolTip = function (e) {
+      var elem = $(e.currentTarget);
+      var fieldScope = elem.scope();
+      var field = fieldScope.field || {};
+      if (!field.tooltip) {
+        return;
+      }
+
+      var record = scope.record;
+      var dataSource = scope._dataSource;
+
+      if (field.serverType === 'many-to-one' || field.serverType === 'one-to-one') {
+        record = fieldScope.getValue();
+        dataSource = fieldScope._dataSource;
+      }
+
+      return {
+        tooltip: field.tooltip,
+        record: record,
+        dataSource: dataSource
+      };
+    };
 
     scope.showErrorNotice = function () {
       var form = scope.form || $(element).data('$formController'),
@@ -1484,6 +1598,7 @@ ui.directive('uiViewForm', ['$compile', 'ViewService', function($compile, ViewSe
         });
         form.removeClass('large-form mid-form mini-form');
       }
+
       scope.$timeout(function () {
         element.append(form);
         preparing = false;
@@ -1501,7 +1616,37 @@ ui.directive('uiViewForm', ['$compile', 'ViewService', function($compile, ViewSe
           .effect('pulsate', { times: 3 }, 600);
       }
     });
+
+    scope.$on('refresh-tab', function () {
+      scope.waitForActions(function () {
+        scope.reloadTab(scope.selectedTab);
+      });
+    });
   };
 }]);
+
+ui.formWidget('uiWkfStatus', {
+  link: function (scope, element, attrs) {
+
+    scope.hasColorCode = function (item) {
+      return item.color && item.color.startsWith('#');
+    };
+
+    scope.getColorClass = function (item) {
+      return item.color ? 'bg-' + item.color : 'bg-blue';
+    };
+  },
+  template:
+    "<div class='panel wkf-status-container'>" +
+      "<div class='panel-body'>" +
+        "<ul class='wkf-status'>" +
+          "<li ng-repeat='item in record.$wkfStatus track by item.name'>" +
+            "<span class='badge' style='background-color: {{item.color}}' ng-if='hasColorCode(item)'>{{item.title}}</span>" +
+            "<span class='badge' ng-class='getColorClass(item)' ng-if='!hasColorCode(item)'>{{item.title}}</span>" +
+          "</li>" +
+        "</ul>" +
+      "</div>" +
+    "</div>"
+});
 
 })();

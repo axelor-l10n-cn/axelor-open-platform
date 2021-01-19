@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <domain-models xmlns="http://axelor.com/xml/ns/domain-models"
   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-  xsi:schemaLocation="http://axelor.com/xml/ns/domain-models http://axelor.com/xml/ns/domain-models/domain-models_5.3.xsd">
+  xsi:schemaLocation="http://axelor.com/xml/ns/domain-models http://axelor.com/xml/ns/domain-models/domain-models_5.4.xsd">
 
   <module name="meta" package="com.axelor.meta.db" />
 
@@ -74,6 +74,7 @@
     <string name="model" />
     <string name="xml" required="true" large="true"/>
     <many-to-one name="user" ref="com.axelor.auth.db.User" column="user_id" required="true" />
+    <boolean name="shared" />
 
     <finder-method name="findByUser" using="name,user" cacheable="true"/>
     <finder-method name="findByUser" using="name,model,user" cacheable="true"/>
@@ -190,6 +191,7 @@
     <string name="title" required="true" namecolumn="true" help="The select item title" />
     <string name="value" required="true" help="The select item value" />
     <string name="icon" help="The image icon to show in UI widgets" />
+    <string name="color" help="The color to use for tags" selection="color.name.selection"/>
     <string name="data" help="The addition data for UI widgets" max="1024" />
     <integer name="order" column="order_seq"/>
     <boolean name="hidden" />
@@ -241,6 +243,18 @@
     <string name="style" />
     <string name="type" column="help_type" selection="help.type.selection" />
     <string name="help" column="help_value" max="1024" multiline="true" required="true" />
+    <index columns="model_name,language,view_name" />
+  </entity>
+
+  <entity name="MetaAttrs" table="META_ATTRS" logUpdates="false">
+    <string name="model" column="model_name" required="true" />
+    <string name="view" column="view_name" />
+    <string name="field" column="field_name" required="true" />
+    <string name="name" column="attr_name" required="true" />
+    <string name="value" column="attr_value" required="true" />
+    <string name="condition" column="condition_value" max="1024" />
+    <integer name="order" column="order_seq" />
+    <many-to-many name="roles" ref="com.axelor.auth.db.Role" />
   </entity>
 
   <entity name="MetaFile" table="META_FILE">

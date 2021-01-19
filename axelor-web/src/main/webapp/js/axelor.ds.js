@@ -395,6 +395,22 @@
         items = items.sort(function (x, y) { return x.columnSequence - y.columnSequence; });
         view.items = items;
       }
+
+      if (view.type === 'form') {
+        // more attrs action
+        var onLoad = 'com.axelor.meta.web.MetaController:moreAttrs';
+        if (view.onLoad) onLoad = view.onLoad + ',' + onLoad;
+        view.onLoad = onLoad;
+        // wkf status
+        view.items.unshift({
+          colSpan: 12,
+          type: "field",
+          name: "$wkfStatus",
+          showTitle: false,
+          widget: "WkfStatus",
+          showIf: "$wkfStatus"
+        });
+      }
     };
 
     function processJsonForm(view) {
@@ -569,6 +585,19 @@
         } else if (item.type === 'field') {
           items.push(item.name);
         }
+
+        // process tag-select
+        processWidget(item);
+        if (item.widget === 'tag-select') {
+          // fetch colors
+          if (item.colorField) {
+            (result.related[item.name] || (result.related[item.name] = [])).push(item.colorField);
+          }
+          // fetch target names
+          if (item.targetName) {
+            (result.related[item.name] || (result.related[item.name] = [])).push(item.targetName);
+          }
+        }
       });
 
       if (view.type === "calendar") {
@@ -642,6 +671,7 @@
       }
 
       function updateFields(fetched) {
+        fetched = fetched || {};
         return FIELDS.get(model).then(function (current) {
           current = current || {};
           if (current !== fetched.fields) {
@@ -708,7 +738,7 @@
           if (pending) {
             pending.then(clear, clear);
             pending.then(function (response) {
-              resolve((response.data || {}).data);
+              resolve((response && response.data || {}).data);
             });
             return promise;
           }
@@ -799,17 +829,17 @@
       return $q.defer();
     };
 
-    ViewService.prototype.action = function(action, model, context, data) {
+    ViewService.prototype.action = function(action, model, context, data, config) {
 
       var params = {
         model: model,
         action: action,
-        data: data || {
+        data: _.extend({ criteria: [] }, data, {
           context: _.extend({ _model: model }, context)
-        }
+        })
       };
 
-      var promise = $http.post('ws/action', params);
+      var promise = $http.post('ws/action', params, config);
       promise.success = function(fn) {
         promise.then(function(response){
           fn(response.data);

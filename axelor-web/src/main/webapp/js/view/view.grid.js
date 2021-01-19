@@ -75,7 +75,7 @@ function GridViewCtrl($scope, $element) {
         };
 
         $scope.filter(opts).then(function(){
-          $scope.$broadcast('on:grid-selection-change', $scope.getContext());
+          $scope.$broadcast('on:grid-selection-change', $scope.getContext(), true);
           $scope.updateRoute();
         });
       });
@@ -154,10 +154,11 @@ function GridViewCtrl($scope, $element) {
     var selection = $scope.selection || [];
     var selectionIds = dataView.mapRowsToIds(selection);
     var hasSelected = _.some(items, function (item) { return item.selected; });
+    var allFetched = _.all(items, function (item) { return item.$fetched; });
     var syncSelection = function () {
       if (dataView.$syncSelection) {
         setTimeout(function(){
-          if (hasSelected) {
+          if (hasSelected || allFetched) {
             dataView.$syncSelection();
           } else {
             dataView.$syncSelection(selection, selectionIds);
@@ -183,16 +184,24 @@ function GridViewCtrl($scope, $element) {
 
     var details = $scope.$details;
     if (details) {
-      details.$timeout(function () {
+      var onSyncDetails = function() {
         var record = details.record || {};
         var found = _.findWhere(items, { id: record.id });
         if (found) {
           found.selected = true;
-          return;
+        } else {
+          details.edit(null);
         }
-        details.edit(null);
         syncSelection();
-      });
+      }
+      if (_.isEmpty(details.record)) {
+        details.$timeout(onSyncDetails);
+      } else {
+        var removeOnSyncDetails = details.$on('on:edit', function() {
+          onSyncDetails();
+          removeOnSyncDetails();
+        });
+      }
     } else {
       syncSelection();
     }
@@ -263,12 +272,22 @@ function GridViewCtrl($scope, $element) {
   };
 
   $scope.selectFields = function() {
-    return _.map($scope.fields, function (field) {
+    var fields = _.map($scope.fields, function (field) {
       if (field.jsonField) {
         return field.name + '::' + (field.jsonType || 'text');
       }
       return field.name;
     });
+
+    // consider target-name on o2o/m2o
+    _.each(($scope.schema||{}).items, function (item) {
+      var field = $scope.fields[item.name] || {};
+      if (item.targetName && item.targetName !== field.targetName && _.endsWith(field.type, 'to-one')) {
+        fields.push(item.name + '.' + item.targetName);
+      }
+    });
+
+    return _.unique(fields);
   };
 
   $scope.filter = function(searchFilter) {
@@ -360,8 +379,8 @@ function GridViewCtrl($scope, $element) {
 
       function toMoment(val) {
         var format = 'MM/YYYY';
-        if (/\d+\/\d+\/\d+/.test(val)) format = 'DD/MM/YYYY';
-        if (/\d+\/\d+\/\d+\s+\d+:\d+/.test(val)) format = 'DD/MM/YYYY HH:mm';
+        if (/\d+\/\d+\/\d+/.test(val)) format = ui.dateFormat;
+        if (/\d+\/\d+\/\d+\s+\d+:\d+/.test(val)) format = ui.dateTimeFormat;
         return val ? moment(val, format) : moment();
       }
 
@@ -370,7 +389,7 @@ function GridViewCtrl($scope, $element) {
       }
 
       function toDateString(val) {
-          return moment.utc(val, 'DD/MM/YYYY').toDate().toISOString().split("T")[0];
+          return moment.utc(val, ui.dateFormat).toDate().toISOString().split("T")[0];
       }
 
       switch(type) {
@@ -633,6 +652,16 @@ function GridViewCtrl($scope, $element) {
       }
     });
 
+    // update selected flags on record
+    if ($scope.record && $scope.field) {
+      var recordItems = $scope.record[$scope.field.name];
+      if (recordItems && recordItems.length === items.length) {
+        _.each(recordItems, function (recordItem, index) {
+          recordItem.selected = items[index].selected;
+        });
+      }
+    }
+
     $scope.selection = selection;
     $scope.$timeout(function () {
       $scope.$broadcast('on:grid-selection-change', $scope.getContext());
@@ -829,10 +858,10 @@ ui.directive('uiViewDetails', ['DataSource', 'ViewService', function(DataSource,
         });
       }
 
-      $scope.selectionChanged = _.debounce(function (selection) {
+      $scope.selectionChanged = _.debounce(function () {
         var current = $scope.record || {};
-        var first = _.first(selection);
-        if (first !== undefined) {
+        var first = parent.pagerIndex(true);
+        if (first > -1) {
           doEdit(first);
         } else if (current.id > 0) {
           $scope.edit(null);
@@ -854,7 +883,6 @@ ui.directive('uiViewDetails', ['DataSource', 'ViewService', function(DataSource,
           if (found) {
             found.selected = true;
           }
-          dataView.$syncSelection([], [], false);
         }
       });
     }],
@@ -866,12 +894,100 @@ ui.directive('uiViewDetails', ['DataSource', 'ViewService', function(DataSource,
 
       scope.$watch('$$dirty', function gridDirtyWatch(dirty) {
         overlay.toggle(dirty);
+        if (scope.$parent.dataView && scope.$parent.dataView.$cancelEdit) {
+          scope.$parent.dataView.$cancelEdit();
+        }
+      });
+
+      scope.$on('$destroy', function () {
+        overlay.remove();
       });
     },
     replace: true,
     templateUrl: "partials/views/details-form.html"
   };
 }]);
+
+ui.directive('uiPortletRefresh', ['NavService', function (NavService) {
+  return function (scope, element) {
+    if (!scope.onRefresh) return;
+
+    var onRefresh = scope.onRefresh.bind(scope);
+    var unwatch = false;
+    var loading = false;
+
+    scope.onRefresh = function () {
+      var tab = NavService.getSelected();
+      var type = (tab.params||{})['details-view'] ? scope.$parent._viewType : tab.viewType || tab.type;
+      if (['dashboard', 'form'].indexOf(type) === -1) {
+        if (unwatch) {
+          unwatch();
+          unwatch = null;
+        }
+        return;
+      }
+
+      if (unwatch || loading) {
+        return;
+      }
+
+      unwatch =  scope.$watch(function portletVisibleWatch() {
+        if (element.is(":hidden")) {
+          return;
+        }
+
+        unwatch();
+        unwatch = null;
+        loading = true;
+
+        scope.waitForActions(function () {
+          scope.ajaxStop(function () {
+            loading = false;
+            onRefresh();
+          });
+        });
+      });
+    };
+  };
+}])
+
+ui.directive('uiNestedGridActions', function () {
+  return {
+    scope: true,
+    link: function (scope, element, attrs) {
+
+      var _getContext = scope.getContext;
+
+      scope.getContext = function () {
+        var dataView = scope.dataView;
+        var selected = _.map(scope.selection || [], function(index) {
+          return dataView.getItem(index).id;
+        });
+        var context = {
+          _parent: _getContext.call(scope),
+          _ids: selected.length ? selected : undefined
+        };
+        return context;
+      };
+
+      scope.isHidden = function () {
+        return false;
+      };
+
+      scope.isReadonlyExclusive = function () {
+        return false;
+      }
+    },
+    replace: true,
+    template:
+      "<div class='panel-related-actions'>" +
+        "<div class='btn-group view-toolbar' ng-if='toolbar.length'>" +
+          "<button ng-repeat='btn in toolbar | filter:{custom: true} | limitTo:3' class='btn' ui-tool-button='btn'>{{btn.title}}</button>" +
+        "</div>" +
+        "<div ui-menu-bar x-menus='[menubar[0]]' x-handler='this' class='view-menubar' ng-if='menubar.length'></div>" +
+      "</div>"
+  }
+});
 
 ui.directive('uiPortletGrid', function(){
   return {
@@ -948,40 +1064,8 @@ ui.directive('uiPortletGrid', function(){
         $scope.onRefresh();
       });
 
-      var unwatch = false;
-      var loading = false;
-
       $scope.onRefresh = function () {
-        var tab = NavService.getSelected();
-        var type = (tab.params||{})['details-view'] ? $scope.$parent._viewType : tab.viewType || tab.type;
-        if (['dashboard', 'form'].indexOf(type) === -1) {
-          if (unwatch) {
-            unwatch();
-            unwatch = null;
-          }
-          return;
-        }
-
-        if (unwatch || loading) {
-          return;
-        }
-
-        unwatch =  $scope.$watch(function gridVisibleWatch() {
-          if ($element.is(":hidden")) {
-            return;
-          }
-
-          unwatch();
-          unwatch = null;
-          loading = true;
-
-          $scope.waitForActions(function () {
-            $scope.ajaxStop(function () {
-              loading = false;
-              $scope.filter({});
-            });
-          });
-        });
+        $scope.filter({});
       };
 
       var _onShow = $scope.onShow;
@@ -1029,7 +1113,7 @@ ui.directive('uiPortletGrid', function(){
     }],
     replace: true,
     template:
-    '<div class="portlet-grid">'+
+    '<div class="portlet-grid" ui-portlet-refresh>'+
       '<div ui-view-grid x-view="schema" x-on-init="onGridInit" x-data-view="dataView" x-editable="false" x-no-filter="{{noFilter}}" x-handler="this"></div>'+
     '</div>'
   };

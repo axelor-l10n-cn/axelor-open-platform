@@ -272,7 +272,13 @@ ui.directive('uiWidgetStates', ['$parse', '$interpolate', function($parse, $inte
   }
 
   function withContext(scope, record) {
-    var values = _.extend({}, scope._context, scope._jsonContext, record);
+    var context = scope._context;
+    var parent = scope.$parent;
+    while (parent) {
+      context = _.extend({}, parent._context, context);
+      parent = parent.$parent;
+    }
+    var values = _.extend({}, context, scope._jsonContext, record);
     return _.extend(values, {
       $user: axelor.config['user.login'],
       $group: axelor.config['user.group'],
@@ -293,10 +299,10 @@ ui.directive('uiWidgetStates', ['$parse', '$interpolate', function($parse, $inte
         handle(rec);
       }
     });
-    scope.$on("on:grid-selection-change", function(e, context) {
+    scope.$on("on:grid-selection-change", function(e, context, force) {
       if (field && field.jsonField) return;
-      if (scope._isNestedGrid === undefined || !scope._isNestedGrid) return;
-      if (!scope._isDetailsForm) {
+      if (!force && (scope._isNestedGrid === undefined || !scope._isNestedGrid)) return;
+      if (!scope._isDetailsForm || force) {
         handle(context);
       }
     });
@@ -424,7 +430,7 @@ ui.directive('uiWidgetStates', ['$parse', '$interpolate', function($parse, $inte
     }
 
     scope.$on("on:record-change", function(e, rec) {
-      scope.$timeout(function () {
+      scope.waitForActions(function () {
         if (field && field.jsonField) {
           handle(scope.record);
         } else if (rec && rec === scope.record) {

@@ -51,6 +51,7 @@ import com.axelor.i18n.I18n;
 import com.axelor.i18n.I18nBundle;
 import com.axelor.i18n.L10n;
 import com.axelor.inject.Beans;
+import com.axelor.meta.MetaFiles;
 import com.axelor.meta.MetaPermissions;
 import com.axelor.meta.MetaStore;
 import com.axelor.meta.db.MetaAction;
@@ -70,11 +71,15 @@ import com.google.common.primitives.Ints;
 import com.google.common.primitives.Longs;
 import com.google.inject.TypeLiteral;
 import com.google.inject.persist.Transactional;
+import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.OutputStream;
+import java.io.OutputStreamWriter;
 import java.io.Writer;
 import java.lang.reflect.Method;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.nio.charset.Charset;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZonedDateTime;
@@ -86,7 +91,9 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import javax.inject.Inject;
@@ -109,6 +116,8 @@ public class Resource<T extends Model> {
 
   private final Event<PreRequest> preRequest;
   private final Event<PostRequest> postRequest;
+
+  private static final Pattern NAME_PATTERN = Pattern.compile("[\\w\\.]+");
 
   @Inject
   @SuppressWarnings("unchecked")
@@ -506,6 +515,14 @@ public class Resource<T extends Model> {
       parentName = (String) childOn.get("parent");
     }
 
+    ImmutableList.of(modelName, parentName).stream()
+        .filter(name -> !NAME_PATTERN.matcher(name).matches())
+        .findAny()
+        .ifPresent(
+            name -> {
+              throw new IllegalArgumentException(String.format("Invalid name: %s", name));
+            });
+
     builder
         .append("SELECT new map(_parent.id as id, count(self.id) as count) FROM ")
         .append(modelName)
@@ -539,8 +556,7 @@ public class Resource<T extends Model> {
       AppSettings.get()
           .getInt(AvailableAppSettings.DATA_EXPORT_FETCH_SIZE, DEFAULT_EXPORT_FETCH_SIZE);
 
-  @SuppressWarnings("all")
-  public int export(Request request, Writer writer) throws IOException {
+  public Response export(Request request, Charset csvCharset) {
     security.get().check(JpaSecurity.CAN_READ, model);
     security.get().check(JpaSecurity.CAN_EXPORT, model);
 
@@ -551,6 +567,30 @@ public class Resource<T extends Model> {
     }
 
     firePreRequestEvent(RequestEvent.EXPORT, request);
+
+    final Response response = new Response();
+    final Map<String, Object> data = new HashMap<>();
+
+    try {
+      final java.nio.file.Path tempFile = MetaFiles.createTempFile(null, ".csv");
+      try (final OutputStream os = new FileOutputStream(tempFile.toFile())) {
+        try (final Writer writer = new OutputStreamWriter(os, csvCharset)) {
+          data.put("exportSize", export(request, writer));
+        }
+      }
+      data.put("fileName", tempFile.toFile().getName());
+      response.setData(data);
+    } catch (IOException e) {
+      response.setException(e);
+    }
+
+    firePostRequestEvent(RequestEvent.EXPORT, request, response);
+
+    return response;
+  }
+
+  @SuppressWarnings("all")
+  private int export(Request request, Writer writer) throws IOException {
 
     List<String> fields = request.getFields();
     List<String> header = new ArrayList<>();
@@ -753,8 +793,6 @@ public class Resource<T extends Model> {
     Response response = new Response();
     response.setTotal(count);
 
-    firePostRequestEvent(RequestEvent.EXPORT, request, response);
-
     return count;
   }
 
@@ -880,11 +918,6 @@ public class Resource<T extends Model> {
 
     // no password change
     if (StringUtils.isBlank(newPassword)) {
-      // Still update password date if blocked field has changed so that user gets logged out.
-      if (values.get("blocked") != null) {
-        user.setPasswordUpdatedOn(LocalDateTime.now());
-      }
-
       return user;
     }
 
@@ -1038,7 +1071,7 @@ public class Resource<T extends Model> {
 
     Request req = newRequest(request, id);
 
-    firePreRequestEvent(RequestEvent.REMOVE, request);
+    firePreRequestEvent(RequestEvent.REMOVE, req);
 
     Model bean = JPA.edit(model, data);
     if (bean.getId() != null) {
@@ -1212,6 +1245,8 @@ public class Resource<T extends Model> {
       Property p = mapper.getProperty(func.getField());
       if (p != null && p.isJson()) {
         selectName = func.toString();
+      } else {
+        selectName = String.format("self.%s", name);
       }
     }
 
@@ -1314,6 +1349,9 @@ public class Resource<T extends Model> {
         if (child != null) {
           result.put(name, child);
         }
+        Optional.ofNullable(mapper.getProperty(name))
+            .filter(Property::isTranslatable)
+            .ifPresent(property -> Translator.translate(result, property));
       }
       return result;
     }

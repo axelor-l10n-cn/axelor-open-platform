@@ -71,6 +71,10 @@ ui.formWidget('BaseSelect', {
     scope.formatItem = function(item) {
       return item;
     };
+
+    scope.findColor = function(item) {
+      return null;
+    };
   },
 
   link_editable: function (scope, element, attrs, model) {
@@ -139,7 +143,10 @@ ui.formWidget('BaseSelect', {
     };
 
     function renderItem(ul, item) {
-      var el = $("<li>").append( $("<a>").html(item.label)).appendTo(ul);
+      var el = $("<li>").append($("<a>").append($("<span>").html(item.label))).appendTo(ul);
+      if (item.color) {
+        el.addClass('tag-select-list-item').addClass(item.color);
+      }
       if (item.click) {
         el.addClass("tag-select-action");
         ul.addClass("tag-select-action-menu");
@@ -266,7 +273,6 @@ function filterSelection(scope, field, selection, current) {
   if (_.isEmpty(selection)) return selection;
   if (_.isEmpty(selectionIn)) return selection;
 
-  var context = (scope.getContext || angular.noop)() || {};
   var list = selectionIn;
 
   if (_.isString(selectionIn)) {
@@ -274,6 +280,7 @@ function filterSelection(scope, field, selection, current) {
     if (expr.indexOf('[') !== 0) {
       expr = '[' + expr + ']';
     }
+    var context = scope.getContext && scope.getContext() || {};
     list = axelor.$eval(scope, expr, context);
   }
 
@@ -302,14 +309,17 @@ ui.formInput('Select', 'BaseSelect', {
 
     var field = scope.field,
       selectionList = field.selectionList || [],
-      selectionMap = {};
+      selectionMap = {},
+      selectionColors = {};
 
     var data = _.map(selectionList, function(item) {
       var value = "" + item.value;
       selectionMap[value] = item.title;
+      selectionColors[value] = item.color;
       return {
         value: value,
-        label: item.title || "&nbsp;"
+        label: item.title || "&nbsp;",
+        color: item.color
       };
     });
 
@@ -363,6 +373,14 @@ ui.formInput('Select', 'BaseSelect', {
         return selectionMap[key] || "";
       }
       return item.label;
+    };
+
+    scope.findColor = function(item) {
+      if (!item) return null;
+      if (field.colorField && field.colorField in item) {
+        return item[field.colorField];
+      }
+      return selectionColors["" + item];
     };
 
     if (field.enumType) {
@@ -492,27 +510,37 @@ ui.formInput('ImageSelect', 'Select', {
       return el;
     };
 
+    scope.onShowSelection = function() {
+      scope.$timeout(function() {
+        input.focus();
+        scope.showSelection();
+      });
+    };
+
     var $render_editable = scope.$render_editable;
     scope.$render_editable = function () {
       $render_editable.apply(scope, arguments);
       setTimeout(function () {
-        element.find('input').css('padding-left', element.find('i.image,img').width());
+        if (!scope.canShowText()) {
+          var img = element.find('i.image,img');
+          img.addClass('image-select-no-labels');
+        }
       });
     };
   },
   template_readonly:
     '<span class="image-select readonly">'+
       '<i ng-if="isIcon" class="fa" ng-class="image"></i>'+
-      '<img ng-if="!isIcon" ng-src="{{image}}"></img> <span ng-show="canShowText()">{{text}}</span>' +
+      '<img ng-if="image && !isIcon" ng-src="{{image}}"></img> <span ng-if="canShowText()">{{text}}</span>' +
     '</span>',
 
   template_editable:
     '<span class="picker-input image-select">'+
-      '<i ng-if="isIcon" class="fa" ng-class="image"></i>'+
-      '<img ng-if="!isIcon" ng-src="{{image}}"></img>' +
+      '<i ng-if="isIcon" class="fa" ng-class="image" ng-click="onShowSelection()"></i>'+
+      '<img ng-if="image && !isIcon" ng-src="{{image}}" ng-click="onShowSelection()"></img>' +
       '<input type="text" autocomplete="off">'+
       '<span class="picker-icons">'+
-        '<i class="fa fa-caret-down" ng-click="showSelection()"></i>'+
+        '<i class="fa fa-caret-down" ng-click="onShowSelection()"></i>'+
       '</span>'+
     '</span>'
 });
@@ -537,15 +565,22 @@ ui.formInput('MultiSelect', 'Select', {
     scope.format = function(value) {
       var items = value,
         values = [];
-      if (!value) {
+      if (_.isBlank(value)) {
         scope.items = [];
         return value;
       }
-      if (!_.isArray(items)) items = items.split(/,\s*/);
+      if (!_.isArray(items)) {
+        if (_.isString(items)) {
+          items = items.split(/,\s*/);
+        } else {
+          items = ["" + items];
+        }
+      }
       values = _.map(items, function(item) {
         return {
           value: item,
-          title: scope.formatItem(item)
+          title: scope.formatItem(item),
+          color: scope.findColor(item),
         };
       });
       scope.items = values;
@@ -618,18 +653,17 @@ ui.formInput('MultiSelect', 'Select', {
       });
     }
 
-    scope.removeItem = function(item) {
-      var items = this.getSelection(),
-        value = _.isString(item) ? item : (item||{}).value;
-
-      items = _.chain(items)
-             .pluck('value')
-           .filter(function(v){
-             return !scope.matchValues(v, value);
-           })
-           .value();
-
+    scope.selectItems = function (items) {
       update(items);
+    };
+
+    scope.removeItem = function(item) {
+      var value = _.isString(item) ? item : (item||{}).value;
+      var items = _.chain(this.getSelection())
+          .pluck('value')
+          .filter(function(v) { return !scope.matchValues(v, value); })
+          .value();
+      scope.selectItems(items);
     };
 
     scope.onShowSelection = function(e) {
@@ -651,16 +685,14 @@ ui.formInput('MultiSelect', 'Select', {
     };
 
     scope.handleSelect = function(e, ui) {
-      var items = this.getSelection(),
-        values = _.pluck(items, 'value');
-      var found = _.find(values, function(v){
-        return scope.matchValues(v, ui.item.value);
-      });
+      var items = this.getSelection();
+      var values = _.pluck(items, 'value');
+      var found = _.find(values, function(v){ return scope.matchValues(v, ui.item.value); });
       if (found) {
         return false;
       }
       values.push(ui.item.value);
-      update(values);
+      scope.selectItems(values);
       scaleInput(50);
     };
 
@@ -695,7 +727,7 @@ ui.formInput('MultiSelect', 'Select', {
           }
           input.autocomplete('close');
           values.push(data.value);
-          update(values);
+          scope.selectItems(values);
         }
       }
     };
@@ -722,7 +754,7 @@ ui.formInput('MultiSelect', 'Select', {
   template_editable:
   '<div class="tag-select picker-input" ng-click="onShowSelection($event)">'+
     '<ul>'+
-    '<li class="tag-item label label-primary" ng-repeat="item in items">'+
+    '<li class="tag-item label label-primary" ng-class="item.color" ng-repeat="item in items">'+
       '<span ng-class="{\'tag-link\': handleClick}" class="tag-text" ng-click="handleClick($event, item.value)">{{item.title}}</span> '+
       '<i class="fa fa-times fa-small" ng-click="removeItem(item)"></i>'+
     '</li>'+
@@ -736,11 +768,24 @@ ui.formInput('MultiSelect', 'Select', {
   '</div>',
   template_readonly:
   '<div class="tag-select">'+
-    '<span class="label label-primary" ng-repeat="item in limited(items)">'+
+    '<span class="label label-primary" ng-class="item.color" ng-repeat="item in limited(items)">'+
       '<span ng-class="{\'tag-link\': handleClick}" class="tag-text" ng-click="handleClick($event, item.value)">{{item.title}}</span>'+
     '</span>'+
     '<span ng-show="more"> {{more}}</span>'+
   '</div>'
+});
+
+ui.formInput('SingleSelect', 'MultiSelect', {
+
+  link_editable: function(scope, element, attrs, model) {
+    this._super.apply(this, arguments);
+
+    var selectItems = scope.selectItems;
+
+    scope.selectItems = function(items) {
+      selectItems.call(scope, _.last(items));
+    };
+  }
 });
 
 ui.formInput('SelectQuery', 'Select', {
@@ -900,6 +945,12 @@ ui.formInput('NavSelect', {
       adjust();
     });
 
+    scope.$watch('attr("selection-in")', function (filter, old) {
+      if (filter !== old) {
+        setup();
+      }
+    });
+
     scope.onSelect = function(select) {
       if (scope.attr('readonly')) {
         return;
@@ -929,8 +980,8 @@ ui.formInput('NavSelect', {
     };
 
     scope.isSelected = function (select) {
-      var value = select ? (isReference ? parseInt(select.value) : select.value) : null;
       var current = scope.getValue();
+      var value = select ? (isReference || _.isNumber(current) ? parseInt(select.value) : select.value) : null;
       if (current && isReference) {
         current = current.id;
       }
@@ -993,7 +1044,7 @@ ui.formInput('NavSelect', {
 
       setMenuTitle(null);
 
-      while (elemNavs.parent().width() > parentWidth) {
+      while (index >= 0 && elemNavs.parent().width() > parentWidth) {
         elem = $(elemNavs[--index]);
         elem.hide();
         if (index === selectedIndex) {
@@ -1010,9 +1061,9 @@ ui.formInput('NavSelect', {
     }
 
     scope.$onAdjust(adjust);
-    scope.$callWhen(setup, function () {
+    scope.$callWhen(function () {
       return element.is(':visible');
-    });
+    }, setup);
   },
   template_editable: null,
   template_readonly: null,

@@ -239,6 +239,15 @@
       },
 
       search: function(options) {
+        function setVersion(value) {
+          if (_.isObject(value)) {
+            if (value.version !== undefined) {
+              value.$version = value.version;
+              delete value.version;
+            }
+            _.each(value, setVersion);
+          }
+        }
 
         var opts = _.extend({
           store: true
@@ -269,6 +278,7 @@
 
         offset = offset || 0;
         context = _.extend({}, this._context, context);
+        _.each(context, setVersion);
 
         var query = extend({
           _domain: domain,
@@ -293,7 +303,6 @@
 
         promise = promise.then(function(response){
           var res = response.data;
-          var length = (res.data||[]).length;
           res.offset = offset;
           res.data = _.unique(res.data, function (a) { return a.id; });
 
@@ -303,10 +312,6 @@
           } else {
             records = res.data || [];
             page = that._pageInfo(res);
-          }
-
-          if (length !== page.size) {
-            page.total -= (length - page.size);
           }
         });
         promise.success = function(fn){

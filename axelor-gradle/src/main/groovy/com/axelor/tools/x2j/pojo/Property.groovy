@@ -1,7 +1,7 @@
 /*
  * Axelor Business Solutions
  *
- * Copyright (C) 2005-2019 Axelor (<http://axelor.com>).
+ * Copyright (C) 2005-2020 Axelor (<http://axelor.com>).
  *
  * This program is free software: you can redistribute it and/or  modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -212,6 +212,18 @@ class Property {
   }
 
   String getSetterBody() {
+    def mappedBy = getMappedBy()
+
+    if (type == "one-to-one" && mappedBy) {
+      return """if (${getGetter()}() != null) {
+\t\t\t${getGetter()}().set${firstUpper(mappedBy)}(null);
+\t\t}
+\t\tif (${name} != null) {
+\t\t\t${name}.set${firstUpper(mappedBy)}(this);
+\t\t}
+\t\tthis.$name = $name;"""
+    }
+
     return "this.$name = $name;"
   }
 
@@ -328,10 +340,17 @@ class Property {
     return attrs["sequence"]
   }
 
+  boolean isEqualsInclude() {
+    if (name == "id" || name == "version") return false
+    if (attrs["equalsInclude"] == "false") return false
+    if (attrs["equalsInclude"] == "true" || isUnique()) return true
+    return entity.equalsIncludeAll && isSimple() && !isVirtual()
+  }
+
   boolean isHashKey() {
     if (name == "id" || name == "version") return false
     if (attrs["hashKey"] == "false") return false
-    if (attrs["hashKey"] == "true" || isUnique()) return true
+    if (attrs["hashKey"] == "true") return true
     return entity.hashAll && isSimple() && !isVirtual()
   }
 
@@ -442,6 +461,7 @@ class Property {
   List<Annotation> getAnnotations() {
     [
       $id(),
+      $equalsInclude(),
       $hashKey(),
       $widget(),
       $binary(),
@@ -823,6 +843,11 @@ class Property {
     def sequence = attrs.get('sequence')?.trim()
     if (!sequence) return null
     return annon("com.axelor.db.annotations.Sequence").add(sequence);
+  }
+
+  private Annotation $equalsInclude() {
+    if (!equalsInclude) return null
+    return annon("com.axelor.db.annotations.EqualsInclude", true)
   }
 
   private Annotation $hashKey() {

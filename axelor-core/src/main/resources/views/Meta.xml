@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <object-views xmlns="http://axelor.com/xml/ns/object-views"
   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-  xsi:schemaLocation="http://axelor.com/xml/ns/object-views http://axelor.com/xml/ns/object-views/object-views_5.3.xsd">
+  xsi:schemaLocation="http://axelor.com/xml/ns/object-views http://axelor.com/xml/ns/object-views/object-views_5.4.xsd">
 
   <selection name="view.type.selection">
     <option value="grid">Grid</option>
@@ -46,6 +46,30 @@
     <option value="tooltip">Tooltip</option>
     <option value="placeholder">Placeholder</option>
     <option value="inline">Inline</option>
+  </selection>
+
+  <selection name="color.name.selection">
+    <option value="red" color="red">Red</option>
+    <option value="pink" color="pink">Pink</option>
+    <option value="purple" color="purple">Purple</option>
+    <option value="deeppurple" color="deeppurple">Deep Purple</option>
+    <option value="indigo" color="indigo">Indigo</option>
+    <option value="blue" color="blue">Blue</option>
+    <option value="lightblue" color="lightblue">Light Blue</option>
+    <option value="cyan" color="cyan">Cyan</option>
+    <option value="teal" color="teal">Teal</option>
+    <option value="green" color="green">Green</option>
+    <option value="lightgreen" color="lightgreen">Light Green</option>
+    <option value="lime" color="lime">Lime</option>
+    <option value="yellow" color="yellow">Yellow</option>
+    <option value="amber" color="amber">Amber</option>
+    <option value="orange" color="orange">Orange</option>
+    <option value="deeporange" color="deeporange">Deep Orange</option>
+    <option value="brown" color="brown">Brown</option>
+    <option value="grey" color="grey">Grey</option>
+    <option value="bluegrey" color="bluegrey">Blue Grey</option>
+    <option value="black" color="black">Black</option>
+    <option value="white" color="white">White</option>
   </selection>
 
   <grid title="All Modules" name="meta-module-grid" model="com.axelor.meta.db.MetaModule"
@@ -300,6 +324,7 @@
       <field name="title"/>
       <field name="value"/>
       <field name="icon"/>
+      <field name="color" widget="SingleSelect" />
       <field name="data"/>
       <field name="hidden"/>
       <field name="order" width="100"/>
@@ -311,6 +336,7 @@
       <field name="title" />
       <field name="value" />
       <field name="icon" />
+      <field name="color" widget="SingleSelect" />
       <field name="data" />
       <field name="hidden" />
       <field name="order" help="Sequence order" width="100" />
@@ -419,6 +445,7 @@
       <field name="style" />
       <field name="view" widget="ref-text"
         x-target-name="name"
+        x-target-search="module"
         x-target="com.axelor.meta.db.MetaView"
         x-domain="self.model = :model AND self.type IN ('form', 'grid')" />
       <field name="language" />
@@ -443,6 +470,30 @@
     <panel title="Help">
       <field name="help" showTitle="false" colSpan="12" />
     </panel>
+  </form>
+
+  <grid title="View Attributes" name="meta-attrs-grid" model="com.axelor.meta.db.MetaAttrs"
+    orderBy="model,view,order">
+    <field name="model" />
+    <field name="view" />
+    <field name="field" />
+    <field name="name" />
+    <field name="value" />
+    <field name="condition" />
+    <field name="order" />
+  </grid>
+
+  <form title="View Attribute" name="meta-attrs-form" model="com.axelor.meta.db.MetaAttrs">
+    <panel title="Overview">
+      <field name="model" />
+      <field name="view" />
+      <field name="field" />
+      <field name="order" />
+      <field name="name" />
+      <field name="value" />
+      <field name="condition" colSpan="12" />
+    </panel>
+    <panel-related field="roles" />
   </form>
 
   <grid title="Files" name="meta-files-grid" model="com.axelor.meta.db.MetaFile">

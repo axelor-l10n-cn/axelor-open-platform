@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <xsd:schema targetNamespace="http://axelor.com/xml/ns/object-views"
   xmlns:xsd="http://www.w3.org/2001/XMLSchema" elementFormDefault="qualified"
-  attributeFormDefault="unqualified" xmlns:tns="http://axelor.com/xml/ns/object-views" version="5.3">
+  attributeFormDefault="unqualified" xmlns:tns="http://axelor.com/xml/ns/object-views" version="5.4">
 
   <xsd:element name="object-views">
     <xsd:complexType>
@@ -533,26 +533,36 @@
     </xsd:complexContent>
   </xsd:complexType>
 
+  <xsd:simpleType name="ColorNameStyle">
+    <xsd:restriction base="xsd:string">
+      <xsd:enumeration value="red" />
+      <xsd:enumeration value="pink" />
+      <xsd:enumeration value="purple" />
+      <xsd:enumeration value="deeppurple" />
+      <xsd:enumeration value="indigo" />
+      <xsd:enumeration value="blue" />
+      <xsd:enumeration value="lightblue" />
+      <xsd:enumeration value="cyan" />
+      <xsd:enumeration value="teal" />
+      <xsd:enumeration value="green" />
+      <xsd:enumeration value="lightgreen" />
+      <xsd:enumeration value="lime" />
+      <xsd:enumeration value="yellow" />
+      <xsd:enumeration value="amber" />
+      <xsd:enumeration value="orange" />
+      <xsd:enumeration value="deeporange" />
+      <xsd:enumeration value="brown" />
+      <xsd:enumeration value="grey" />
+      <xsd:enumeration value="bluegrey" />
+      <xsd:enumeration value="black" />
+      <xsd:enumeration value="white" />
+      <xsd:enumeration value="olive" />
+      <xsd:enumeration value="violet" />
+    </xsd:restriction>
+  </xsd:simpleType>
+
   <xsd:simpleType name="ColorStyle">
-    <xsd:union>
-      <xsd:simpleType>
-        <xsd:restriction base="xsd:string">
-          <xsd:enumeration value="green" />
-          <xsd:enumeration value="blue" />
-          <xsd:enumeration value="red" />
-          <xsd:enumeration value="yellow" />
-          <xsd:enumeration value="pink" />
-          <xsd:enumeration value="orange" />
-          <xsd:enumeration value="olive" />
-          <xsd:enumeration value="purple" />
-          <xsd:enumeration value="violet" />
-          <xsd:enumeration value="teal" />
-          <xsd:enumeration value="brown" />
-          <xsd:enumeration value="grey" />
-          <xsd:enumeration value="white" />
-          <xsd:enumeration value="black" />
-        </xsd:restriction>
-      </xsd:simpleType>
+    <xsd:union memberTypes="tns:ColorNameStyle">
       <xsd:simpleType>
         <xsd:restriction base="xsd:string">
           <xsd:pattern value="#[\dA-Fa-f]{6}([\dA-Fa-f][\dA-Fa-f])?"></xsd:pattern>
@@ -562,14 +572,18 @@
   </xsd:simpleType>
 
   <xsd:simpleType name="HiliteStyle">
-    <xsd:restriction base="xsd:string">
-      <xsd:enumeration value="default"/>
-      <xsd:enumeration value="primary"/>
-      <xsd:enumeration value="warning"/>
-      <xsd:enumeration value="success"/>
-      <xsd:enumeration value="danger"/>
-      <xsd:enumeration value="info"/>
-    </xsd:restriction>
+    <xsd:union memberTypes="tns:ColorNameStyle">
+      <xsd:simpleType>
+        <xsd:restriction base="xsd:string">
+          <xsd:enumeration value="default"/>
+          <xsd:enumeration value="primary"/>
+          <xsd:enumeration value="warning"/>
+          <xsd:enumeration value="success"/>
+          <xsd:enumeration value="danger"/>
+          <xsd:enumeration value="info"/>
+        </xsd:restriction>
+      </xsd:simpleType>
+    </xsd:union>
   </xsd:simpleType>
 
   <xsd:simpleType name="LabelStyle">
@@ -620,6 +634,11 @@
               <xsd:attribute name="icon" type="xsd:string">
                 <xsd:annotation>
                   <xsd:documentation>Image icon to show for this item.</xsd:documentation>
+                </xsd:annotation>
+              </xsd:attribute>
+              <xsd:attribute name="color" type="xsd:string">
+                <xsd:annotation>
+                  <xsd:documentation>Tag color for this item.</xsd:documentation>
                 </xsd:annotation>
               </xsd:attribute>
               <xsd:attribute name="order" type="xsd:int">
@@ -942,6 +961,27 @@
         <xsd:documentation>Specify the default page limit of search popup.</xsd:documentation>
       </xsd:annotation>
     </xsd:attribute>
+    <xsd:attribute name="x-color-field" type="xsd:string">
+      <xsd:annotation>
+        <xsd:documentation>
+        Specify the color field to use with tag-select widget.
+        </xsd:documentation>
+      </xsd:annotation>
+    </xsd:attribute>
+    <xsd:attribute name="x-popup-maximized">
+      <xsd:annotation>
+        <xsd:documentation>
+        Specify whether to open the popup as maximized.
+        </xsd:documentation>
+      </xsd:annotation>
+      <xsd:simpleType>
+        <xsd:restriction base="xsd:string">
+          <xsd:enumeration value="all" />
+          <xsd:enumeration value="editor" />
+          <xsd:enumeration value="selector" />
+        </xsd:restriction>
+      </xsd:simpleType>
+    </xsd:attribute>
   </xsd:attributeGroup>
 
   <xsd:attributeGroup name="ObjectViewAttributes">
@@ -1033,6 +1073,16 @@
           <xsd:annotation>
             <xsd:documentation>Whether to fetch initial records.</xsd:documentation>
           </xsd:annotation>
+        </xsd:attribute>
+        <xsd:attribute name="x-selector">
+          <xsd:annotation>
+            <xsd:documentation>Specify the row selection control</xsd:documentation>
+          </xsd:annotation>
+          <xsd:simpleType>
+            <xsd:restriction base="xsd:string">
+              <xsd:enumeration value="checkbox" />
+            </xsd:restriction>
+          </xsd:simpleType>
         </xsd:attribute>
         <xsd:attribute name="edit-icon" type="xsd:boolean" default="true">
           <xsd:annotation>
@@ -1235,8 +1285,19 @@
             <xsd:documentation>Specify whether the rows can be moved to re-orders by sequence.</xsd:documentation>
           </xsd:annotation>
         </xsd:attribute>
+        <xsd:attribute name="x-selector">
+          <xsd:annotation>
+            <xsd:documentation>Specify the row selection control</xsd:documentation>
+          </xsd:annotation>
+          <xsd:simpleType>
+            <xsd:restriction base="xsd:string">
+              <xsd:enumeration value="checkbox" />
+            </xsd:restriction>
+          </xsd:simpleType>
+        </xsd:attribute>
         <xsd:attribute name="showTitle" use="prohibited" />
         <xsd:attributeGroup ref="tns:RelationalAttributes" />
+        <xsd:attributeGroup ref="tns:ExtraAttributes" />
       </xsd:extension>
     </xsd:complexContent>
   </xsd:complexType>
@@ -1296,6 +1357,7 @@
           <xsd:element name="field" type="tns:BaseField"/>
           <xsd:element name="button" type="tns:Button"/>
           <xsd:element name="spacer" type="tns:Spacer" />
+          <xsd:element name="separator" type="tns:Separator" />
           <xsd:element name="label" type="tns:Label" />
           <xsd:element name="panel">
             <xsd:complexType>
@@ -1725,28 +1787,28 @@
         <xsd:attribute name="x-finish-to-start" type="xsd:string" use="optional">
           <xsd:annotation>
             <xsd:documentation>
-              Name of the M2M field contains links finish to start current task.
+              Name of the M2M field containing tasks to finish before starting current task.
             </xsd:documentation>
           </xsd:annotation>
         </xsd:attribute>
         <xsd:attribute name="x-start-to-start" type="xsd:string" use="optional">
           <xsd:annotation>
             <xsd:documentation>
-              Name of the M2M field contains links start to start current task.
+              Name of the M2M field containing tasks to start before starting current task.
             </xsd:documentation>
           </xsd:annotation>
         </xsd:attribute>
         <xsd:attribute name="x-finish-to-finish" type="xsd:string" use="optional">
           <xsd:annotation>
             <xsd:documentation>
-              Name of the M2M field contains links finish to finsh current task.
+              Name of the M2M field containing tasks to finish before finishing current task.
             </xsd:documentation>
           </xsd:annotation>
         </xsd:attribute>
         <xsd:attribute name="x-start-to-finish" type="xsd:string" use="optional">
           <xsd:annotation>
             <xsd:documentation>
-              Name of the M2M field contains links start to finish current task.
+              Name of the M2M field containing tasks to start before finishing current task.
             </xsd:documentation>
           </xsd:annotation>
        </xsd:attribute>
@@ -1775,6 +1837,26 @@
       </xsd:annotation>
     </xsd:attribute>
   </xsd:complexType>
+
+  <xsd:simpleType name="CardEditWindow">
+    <xsd:restriction base="xsd:string">
+      <xsd:enumeration value="self">
+        <xsd:annotation>
+          <xsd:documentation>Show editor in same tab.</xsd:documentation>
+        </xsd:annotation>
+      </xsd:enumeration>
+      <xsd:enumeration value="popup">
+        <xsd:annotation>
+          <xsd:documentation>Show popup editor</xsd:documentation>
+        </xsd:annotation>
+      </xsd:enumeration>
+      <xsd:enumeration value="popup-new">
+        <xsd:annotation>
+          <xsd:documentation>Show popup editor when creating new record.</xsd:documentation>
+        </xsd:annotation>
+      </xsd:enumeration>
+    </xsd:restriction>
+  </xsd:simpleType>
 
   <xsd:complexType name="CardsView">
     <xsd:complexContent>
@@ -1831,6 +1913,11 @@
             <xsd:documentation>Specify whether to show the 'Delete' button.</xsd:documentation>
           </xsd:annotation>
         </xsd:attribute>
+        <xsd:attribute name="edit-window" type="tns:CardEditWindow">
+          <xsd:annotation>
+            <xsd:documentation>Specify how to show editor window.</xsd:documentation>
+          </xsd:annotation>
+        </xsd:attribute>
       </xsd:extension>
     </xsd:complexContent>
   </xsd:complexType>
@@ -1870,6 +1957,13 @@
         <xsd:attribute name="limit" type="xsd:integer">
           <xsd:annotation>
             <xsd:documentation>Specify pagination limit per column.</xsd:documentation>
+          </xsd:annotation>
+        </xsd:attribute>
+        <xsd:attribute name="x-limit-columns" type="xsd:integer">
+          <xsd:annotation>
+            <xsd:documentation>
+            Specify maximum number of columns when columnBy is a reference field.
+            </xsd:documentation>
           </xsd:annotation>
         </xsd:attribute>
       </xsd:extension>
@@ -2441,6 +2535,20 @@
     </xsd:complexContent>
   </xsd:complexType>
 
+  <xsd:complexType name="ToolTip">
+    <xsd:simpleContent>
+      <xsd:extension base="tns:PanelViewer">
+        <xsd:attribute name="call" type="xsd:string">
+          <xsd:annotation>
+            <xsd:documentation>
+            Specify a controller method to fetch tooltip data.
+            </xsd:documentation>
+          </xsd:annotation>
+        </xsd:attribute>
+      </xsd:extension>
+    </xsd:simpleContent>
+  </xsd:complexType>
+
   <xsd:complexType name="BaseField">
     <xsd:complexContent>
       <xsd:extension base="tns:SimpleWidget">
@@ -2449,6 +2557,13 @@
             <xsd:annotation>
               <xsd:documentation>
                 Hilite the field with given color/background-color combination.
+              </xsd:documentation>
+            </xsd:annotation>
+          </xsd:element>
+          <xsd:element name="tooltip" type="tns:ToolTip" minOccurs="0">
+            <xsd:annotation>
+              <xsd:documentation>
+              Template to display the tooltip popup for the field.
               </xsd:documentation>
             </xsd:annotation>
           </xsd:element>
@@ -2606,7 +2721,6 @@
         <xsd:attribute name="canSelect" use="prohibited" />
         <xsd:attribute name="edit-window" use="prohibited" />
         <xsd:attribute name="summary-view" use="prohibited" />
-        <xsd:attribute name="target-name" use="prohibited" />
         <xsd:attribute name="colSpan" use="prohibited" />
         <xsd:attribute name="colOffset" use="prohibited" />
         <xsd:attribute name="showTitle" use="prohibited" />
@@ -2622,10 +2736,21 @@
     </xsd:complexContent>
   </xsd:complexType>
 
+  <xsd:complexType name="GridButton">
+    <xsd:complexContent>
+      <xsd:extension base="tns:Button">
+        <xsd:attribute name="colSpan" use="prohibited" />
+        <xsd:attribute name="colOffset" use="prohibited" />
+        <xsd:attribute name="height" use="prohibited" />
+        <xsd:attribute name="link" use="prohibited" />
+      </xsd:extension>
+    </xsd:complexContent>
+  </xsd:complexType>
+
   <xsd:group name="GridWidgets">
     <xsd:choice>
       <xsd:element name="field" type="tns:GridField" />
-      <xsd:element name="button" type="tns:Button" />
+      <xsd:element name="button" type="tns:GridButton" />
     </xsd:choice>
   </xsd:group>
 
@@ -2687,11 +2812,12 @@
       <xsd:element name="menu" type="tns:MenubarMenu" />
       <xsd:element name="item" type="tns:MenubarMenuItem" />
       <xsd:element name="divider" type="tns:MenubarMenuDivider" />
-      <xsd:element name="viewer" type="tns:PanelViewer"></xsd:element>
-      <xsd:element name="editor" type="tns:PanelEditor"></xsd:element>
-      <xsd:element name="panel-stack" type="tns:PanelTabs"></xsd:element>
-      <xsd:element name="panel-tabs" type="tns:PanelTabs"></xsd:element>
-      <xsd:element name="panel-mail" type="tns:PanelMail"></xsd:element>
+      <xsd:element name="tooltip" type="tns:ToolTip"/>
+      <xsd:element name="viewer" type="tns:PanelViewer" />
+      <xsd:element name="editor" type="tns:PanelEditor" />
+      <xsd:element name="panel-stack" type="tns:PanelTabs" />
+      <xsd:element name="panel-tabs" type="tns:PanelTabs" />
+      <xsd:element name="panel-mail" type="tns:PanelMail" />
     </xsd:choice>
   </xsd:group>
 
@@ -2839,7 +2965,10 @@
         </xsd:attribute>
         <xsd:attribute name="action" type="xsd:string">
           <xsd:annotation>
-            <xsd:documentation>An action-record to be executed on confimation.</xsd:documentation>
+            <xsd:documentation>
+            An action to be executed on error or alert message to make corrective measures, when
+            error dialog is closed or alert dialog is canceled.
+            </xsd:documentation>
           </xsd:annotation>
         </xsd:attribute>
       </xsd:extension>

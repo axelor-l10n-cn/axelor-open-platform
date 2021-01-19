@@ -114,6 +114,10 @@ ui.formCompile = function(element, attrs, linkerFn) {
       scope.$$readonly = scope.$$isReadonly();
     });
 
+    scope.$on("on:attrs-reset", function() {
+      resetAttrs();
+    });
+
     scope.$on("on:attrs-changed", function(event, attr) {
       if (attr.name === "readonly" || attr.name === "force-edit") {
         scope.$$readonly = scope.$$isReadonly();
@@ -231,12 +235,15 @@ ui.formCompile = function(element, attrs, linkerFn) {
 
     var hideFn = _.contains(this.handles, 'isHidden') ? angular.noop : hideWidget;
 
-    var hiddenSet = false;
-    scope.$watch("isHidden()", function isHiddenWatch(hidden, old) {
-      if (hiddenSet && hidden === old) return;
-      hiddenSet = true;
-      return hideFn(hidden);
-    });
+    // Ignore hiding of fields in editable grid
+    if (!scope.view || scope.view.type !== 'grid') {
+      var hiddenSet = false;
+      scope.$watch("isHidden()", function isHiddenWatch(hidden, old) {
+        if (hiddenSet && hidden === old) return;
+        hiddenSet = true;
+        return hideFn(hidden);
+      });
+    }
 
     var readonlySet = false;
     scope.$watch("isReadonly()", function isReadonlyWatch(readonly, old) {

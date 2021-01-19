@@ -21,20 +21,42 @@
 
   var ui = angular.module('axelor.ui');
 
-  var currencySymbols = {
-    en: '\u0024',
-    fr: '\u20AC'
+  var getFirstBrowserLanguage = function () {
+    var nav = window.navigator,
+      browserLanguagePropertyKeys = ['language', 'browserLanguage', 'systemLanguage', 'userLanguage'],
+      i,
+      language;
+
+    // support for HTML 5.1 "navigator.languages"
+    if (Array.isArray(nav.languages)) {
+      for (i = 0; i < nav.languages.length; i++) {
+        language = nav.languages[i];
+        if (language && language.length) {
+          return language;
+        }
+      }
+    }
+
+    // support for other well known properties in browsers
+    for (i = 0; i < browserLanguagePropertyKeys.length; i++) {
+      language = nav[browserLanguagePropertyKeys[i]];
+      if (language && language.length) {
+        return language;
+      }
+    }
+
+    return null;
   };
 
-  var thousandSeparator = {
-    en: ',',
-    fr: ' '
-  };
+  function getBrowserLocale() {
+    return getFirstBrowserLanguage() || axelor.config['user.lang'] || 'en';
+  }
 
   function addCurrency(value, symbol) {
     if (value && symbol) {
       var val = '' + value;
-      if (axelor.config['user.lang'] === 'fr' ) {
+      var lang = getBrowserLocale().split(/-|_/)[0];
+      if (lang === 'fr') {
         return _.endsWith(val, symbol) ? val : val + ' ' + symbol;
       }
       return _.startsWith(val, symbol) ? val : symbol + val;
@@ -67,6 +89,9 @@
       var val = record || {};
       var idx = 0;
       while (val && idx < path.length) {
+        if (_.isString(val)) {
+          val = fromJsonOrEmpty(val);
+        }
         val = val[path[idx++]];
       }
       if (idx === path.length) {
@@ -74,6 +99,14 @@
       }
     }
     return undefined;
+  }
+
+  function fromJsonOrEmpty(json) {
+    try {
+      return angular.fromJson(json);
+    } catch (e) {
+      return {};
+    }
   }
 
   function setNested(record, name, value) {
@@ -92,27 +125,136 @@
     return record;
   }
 
+  function getNestedTrKey(nameField) {
+    if (!nameField) {
+      return undefined;
+    }
+    var names = nameField.split('.');
+    names.push('$t:' + names.pop());
+    return names.join('.');
+  }
+
   // override angular.js currency filter
-  ui.filter('currency', function () {
-    return addCurrency;
+  var currencySymbolToCode = {
+      '$': 'USD',
+      '€': 'EUR',
+      '¥': 'JPY',
+      '£': 'GBP'
+  };
+  ui.filter('currency', function() {
+    return function(value, symbol, fractionSize, currencyDisplay) {
+      if (_.isBlank(value)) {
+        return value;
+      }
+      if (isNaN(value) || _.isBlank(symbol)) {
+        return addCurrency(value, symbol);
+      }
+      var options = {
+        style : 'currency',
+        currency : currencySymbolToCode[symbol] || symbol,
+      };
+      if (fractionSize !== undefined && fractionSize != null) {
+        options.minimumFractionDigits = fractionSize;
+        options.maximumFractionDigits = fractionSize;
+      }
+      if (currencyDisplay !== undefined && currencyDisplay != null) {
+        options.currencyDisplay = currencyDisplay
+      }
+      return new Intl.NumberFormat(getBrowserLocale(), options).format(value);
+    };
+  });
+
+  // add percent filter
+  ui.filter('percent', function() {
+    return function(value, fractionSize) {
+      if (_.isBlank(value)) {
+        return value;
+      }
+      if (isNaN(value)) {
+        return value + '%';
+      }
+      var options = {
+        style : 'percent'
+      };
+      if (fractionSize !== undefined && fractionSize !== null) {
+        options.minimumFractionDigits = fractionSize;
+        options.maximumFractionDigits = fractionSize;
+      } else {
+        options.maximumFractionDigits = 1;
+      }
+      return new Intl.NumberFormat(getBrowserLocale(), options).format(value);
+    };
+  });
+
+  // override angular.js number filter
+  ui.filter('number', function() {
+    return function(value, fractionSize) {
+      return formatNumber(null, value, fractionSize);
+    };
+  });
+
+  // override angular.js date filter
+  ui.filter('date', function() {
+    return function(value, format) {
+      if (!value || !value.match(/\d{4,}\D\d{2}\D\d{2}/)) {
+        return value;
+      }
+      if (format === undefined || format == null) {
+        return value && value.length > 10 ? formatDateTime(value) : formatDate(value);
+      }
+      return moment(value).locale(getBrowserLocale()).format(format);
+    };
   });
 
   function formatNumber(field, value, scale) {
     var num = +(value);
-    if ((value === null || value === undefined) && !field.defaultValue) {
+    if ((value === null || value === undefined) && (!field || !field.defaultValue)) {
       return value;
     }
     if (num === 0 || num) {
-      var lang = axelor.config['user.lang'];
-      var tsep = thousandSeparator[lang] || thousandSeparator.en;
-      return _.numberFormat(num, scale, '.', tsep);
+      return num.toLocaleString(getBrowserLocale(), {
+        minimumFractionDigits: scale,
+        maximumFractionDigits: scale
+      });
     }
     return value;
+  }
+
+  function formatDate(value) {
+    var format = arguments.length > 1 ? arguments[1] : ui.dateFormat;
+    return value ? moment(value).format(format) : "";
+  }
+
+  function formatDateTime(value) {
+    var format = arguments.length > 1 ? arguments[1] : ui.dateTimeFormat;
+    return value ? moment(value).format(format) : "";
   }
 
   ui.findNested = findNested;
   ui.setNested = setNested;
   ui.canSetNested = canSetNested;
+  ui.getNestedTrKey = getNestedTrKey;
+
+  var mm = moment().clone();
+  mm.locale(getBrowserLocale());
+  var dateFormat = (mm.localeData()._longDateFormat.L || 'DD/MM/YYYY')
+    .replace(/\u200f/g, '') // ar
+    .replace(/YYYY年MMMD日/g, 'YYYY-MM-DD') // zh-tw
+    .replace(/MMM/g, 'MM') // Don't support MMM
+    .replace(/(?<!D)D(?!D)/g, 'DD') // D -> DD
+    .replace(/(?<!M)M(?!M)/g, 'MM'); // M -> MM
+
+  Object.defineProperty(ui, 'dateFormat', {
+    get: function () {
+      return dateFormat;
+    }
+  });
+
+  Object.defineProperty(ui, 'dateTimeFormat', {
+    get: function () {
+      return this.dateFormat + ' HH:mm';
+    }
+  });
 
   ui.formatters = {
 
@@ -148,7 +290,7 @@
     },
 
     "date": function(field, value) {
-      return value ? moment(value).format('DD/MM/YYYY') : "";
+      return formatDate(value);
     },
 
     "time": function(field, value) {
@@ -156,7 +298,7 @@
     },
 
     "datetime": function(field, value) {
-      return value ? moment(value).format('DD/MM/YYYY HH:mm') : "";
+      return formatDateTime(value);
     },
 
     "many-to-one": function(field, value) {
@@ -208,22 +350,22 @@
     var n = record.id;
     if (n > 0) {
       return "ws/rest/" + model + "/" + n + "/" + imageName + "/download?image=true&v=" + v
-        + "&parentId=" + scope.record.id + "&parentModel=" + scope._model;
+        + "&parentId=" + n + "&parentModel=" + model;
     }
     return "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7";
   };
 
   ui.formatters.$fmt = function (scope, fieldName, fieldValue, record) {
     var context = record || scope.record || {};
-    var value = arguments.length === 2 ? context[fieldName] : fieldValue;
+    var value = arguments.length === 2 ? findNested(context, fieldName) : fieldValue;
     if (value === undefined || value === null) {
       return "";
     }
-    var field = findField(scope, fieldName);
+    var field = findField(scope, fieldName) || scope.field;
     if (!field) {
       return value;
     }
-    var type = field.selection ? "selection" : field.type;
+    var type = field.selection ? "selection" : field.serverType || field.type;
     var formatter = ui.formatters[type];
     if (formatter) {
       return formatter(field, value, context);

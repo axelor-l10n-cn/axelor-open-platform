@@ -83,6 +83,8 @@ function CalendarViewCtrl($scope, $element) {
   }
 
   $scope.fetchItems = function(start, end, callback) {
+    start = start.clone().local();
+    end = end.clone().local();
     var fields = _.pluck(this.fields, 'name');
     var criteria = {
       operator: "and",
@@ -108,7 +110,7 @@ function CalendarViewCtrl($scope, $element) {
             operator: ">=",
             value: start
           }, {
-            fieldName: view.stop,
+            fieldName: view.start,
             operator: "<=",
             value: end
           }]
@@ -643,8 +645,8 @@ angular.module('axelor.ui').directive('uiViewCalendar', ['ViewService', 'ActionS
       var view = this.schema;
       var record = _.extend({}, event.record);
 
-      record[view.eventStart] = event.start;
-      record[view.eventStop] = event.end;
+      record[view.eventStart] = event.start ? event.start.clone().local() : event.start;
+      record[view.eventStop] = event.end ? event.end.clone().local() : event.end;
 
       if (!editor) {
         editor = ViewService.compile('<div ui-editor-popup></div>')(scope.$new());
@@ -739,7 +741,9 @@ angular.module('axelor.ui').directive('uiViewCalendar', ['ViewService', 'ActionS
     scope.$callWhen(function () {
       return main.is(':visible');
     }, function() {
-      element.parents('.view-container:first').css('overflow', 'inherit');
+      if (scope.viewType !== 'dashboard') {
+        element.parents('.view-container:first').css('overflow', 'inherit');
+      }
       scope.onMode(mode);
       adjustSize();
     }, 100);
@@ -765,5 +769,25 @@ angular.module('axelor.ui').directive('uiViewCalendar', ['ViewService', 'ActionS
     '</div>'
   };
 }]);
+
+angular.module('axelor.ui').directive('uiPortletCalendar', function () {
+  return {
+    controller: CalendarViewCtrl,
+    replace: true,
+    link: function (scope, element, attrs) {
+      var colSpan = (scope.dashlet||{}).colSpan || 6;
+      var height = (scope.dashlet||{}).height;
+      height = height || (50 * colSpan);
+      setTimeout(function () {
+        element.parent().height(height);
+      });
+      scope.showPager = true;
+    },
+    template:
+      "<div class='portlet-calendar' ui-portlet-refresh>" +
+        "<div ui-view-calendar x-handler='this'></div>" +
+      "</div>"
+  };
+});
 
 })();

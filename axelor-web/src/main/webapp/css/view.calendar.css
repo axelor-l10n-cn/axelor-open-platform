@@ -76,6 +76,7 @@
 
 .calendar-bubble-content {
   overflow: hidden;
+  width: 100%;
 }
 
 .calendar-bubble-content hr {
@@ -84,4 +85,17 @@
 
 .calendar-view .fc-widget-header {
   font-weight: 600;
+}
+
+.portlet-calendar {
+    position: relative;
+}
+
+.portlet-calendar [ui-view-calendar] {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  bottom: 4px;
+  left: 4px;
+  display: flex;
 }

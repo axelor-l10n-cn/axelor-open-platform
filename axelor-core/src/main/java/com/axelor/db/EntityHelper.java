@@ -82,6 +82,7 @@ public final class EntityHelper {
    * @param entity generate the hashCode for the given entity
    * @return hashCode
    */
+  @Deprecated
   public static <T extends Model> int hashCode(T entity) {
     if (entity == null) {
       return 31;
@@ -90,7 +91,7 @@ public final class EntityHelper {
     final List<Object> values = new ArrayList<>();
 
     for (Property p : mapper.getProperties()) {
-      if (isSimple(p) && (p.isHashKey() || p.isUnique())) {
+      if (isSimple(p) && p.isHashKey()) {
         values.add(p.get(entity));
       }
     }
@@ -125,18 +126,19 @@ public final class EntityHelper {
     }
 
     final Mapper mapper = Mapper.of(entity.getClass());
-    boolean hasHashKeys = false;
+    final List<Object> equalsValues = new ArrayList<>();
 
     for (Property field : mapper.getProperties()) {
-      if (field.isHashKey()) {
-        hasHashKeys = true;
-        if (!Objects.equals(field.get(entity), field.get(other))) {
+      if (field.isEqualsInclude()) {
+        final Object value = field.get(entity);
+        equalsValues.add(value);
+        if (!Objects.equals(value, field.get(other))) {
           return false;
         }
       }
     }
 
-    return hasHashKeys;
+    return equalsValues.stream().anyMatch(Objects::nonNull);
   }
 
   /**

@@ -19,18 +19,23 @@ package com.axelor.test.db;
 
 import com.axelor.db.EntityHelper;
 import com.axelor.db.JpaModel;
+import com.axelor.db.annotations.EqualsInclude;
+import com.axelor.db.annotations.HashKey;
 import com.axelor.db.annotations.NameColumn;
 import com.axelor.db.annotations.VirtualColumn;
 import com.axelor.db.annotations.Widget;
 import com.google.common.collect.Lists;
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 import javax.persistence.Access;
 import javax.persistence.AccessType;
 import javax.persistence.Basic;
 import javax.persistence.CascadeType;
+import javax.persistence.Column;
 import javax.persistence.Entity;
 import javax.persistence.FetchType;
 import javax.persistence.Lob;
@@ -93,9 +98,30 @@ public class Contact extends JpaModel {
   @Basic(fetch = FetchType.LAZY)
   private byte[] image;
 
+  @Widget(selection = "contact.type")
+  private String contactType;
+
+  @Basic
+  @Type(type = "com.axelor.db.hibernate.type.ValueEnumType")
+  private EnumStatusNumber contactStatus;
+
   @Transient
   @Widget(multiline = true)
   private String notes;
+
+  @EqualsInclude
+  @Column(unique = true)
+  private String uniqueName;
+
+  @EqualsInclude
+  @HashKey
+  @Column(unique = true)
+  private String UUID;
+
+  @ManyToMany(
+      fetch = FetchType.LAZY,
+      cascade = {CascadeType.PERSIST, CascadeType.MERGE})
+  private Set<Contact> relatedContacts;
 
   @Widget(title = "Attributes")
   @Type(type = "json")
@@ -237,6 +263,22 @@ public class Contact extends JpaModel {
     this.image = image;
   }
 
+  public String getContactType() {
+    return contactType;
+  }
+
+  public void setContactType(String contactType) {
+    this.contactType = contactType;
+  }
+
+  public EnumStatusNumber getContactStatus() {
+    return contactStatus;
+  }
+
+  public void setContactStatus(EnumStatusNumber contactStatus) {
+    this.contactStatus = contactStatus;
+  }
+
   public String getNotes() {
     return notes;
   }
@@ -245,12 +287,77 @@ public class Contact extends JpaModel {
     this.notes = notes;
   }
 
+  public String getUniqueName() {
+    return uniqueName;
+  }
+
+  public void setUniqueName(String uniqueName) {
+    this.uniqueName = uniqueName;
+  }
+
+  public String getUUID() {
+    return UUID;
+  }
+
+  public void setUUID(String UUID) {
+    this.UUID = UUID;
+  }
+
+  public Set<Contact> getRelatedContacts() {
+    return relatedContacts;
+  }
+
+  public void setRelatedContacts(Set<Contact> relatedContacts) {
+    this.relatedContacts = relatedContacts;
+  }
+
+  public void addRelatedContact(Contact item) {
+    if (getRelatedContacts() == null) {
+      setRelatedContacts(new HashSet<>());
+    }
+    getRelatedContacts().add(item);
+  }
+
+  public void removeRelatedContact(Contact item) {
+    if (getRelatedContacts() == null) {
+      return;
+    }
+    getRelatedContacts().remove(item);
+  }
+
+  public void clearRelatedContacts() {
+    if (getRelatedContacts() != null) {
+      getRelatedContacts().clear();
+    }
+  }
+
   public String getAttrs() {
     return attrs;
   }
 
   public void setAttrs(String attrs) {
     this.attrs = attrs;
+  }
+
+  @Override
+  public boolean equals(Object obj) {
+    if (obj == null) return false;
+    if (this == obj) return true;
+    if (!(obj instanceof Contact)) return false;
+
+    final Contact other = (Contact) obj;
+    if (this.getId() != null || other.getId() != null) {
+      return Objects.equals(this.getId(), other.getId());
+    }
+
+    return Objects.equals(getUniqueName(), other.getUniqueName())
+        && Objects.equals(getUUID(), other.getUUID())
+        && (getUniqueName() != null || getUUID() != null);
+  }
+
+  @Override
+  public int hashCode() {
+    return Objects.hash(this.getUUID());
   }
 
   @Override

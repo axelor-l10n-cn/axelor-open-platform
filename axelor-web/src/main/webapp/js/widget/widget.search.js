@@ -337,7 +337,7 @@ ui.directive('uiFilterInput', function() {
       var isopattern = /^(\d{4}-\d{2}-\d{2}T.*)$/;
 
       var options = {
-        dateFormat: 'dd/mm/yy',
+        dateFormat: ui.dateFormat.toLowerCase().replace('yyyy', 'yy'),
         showButtonsPanel: false,
         showTime: false,
         showOn: null,
@@ -358,7 +358,7 @@ ui.directive('uiFilterInput', function() {
 
       model.$formatters.push(function(value) {
         if (_.isDate(value)) {
-          value = moment(value).format('DD/MM/YYYY');
+          value = moment(value).format(ui.dateFormat);
         }
         return value;
       });
@@ -369,8 +369,8 @@ ui.directive('uiFilterInput', function() {
             return value;
           } else if (pattern.test(value)) {
             var isValue2 = _.str.endsWith(attrs.ngModel, 'value2');
-            return isValue2 ? moment(value, 'DD/MM/YYYY').endOf('day').toDate() :
-                      moment(value, 'DD/MM/YYYY').startOf('day').toDate();
+            return isValue2 ? moment(value, ui.dateFormat).endOf('day').toDate() :
+                      moment(value, ui.dateFormat).startOf('day').toDate();
           }
           return null;
         }
@@ -393,8 +393,8 @@ ui.directive('uiFilterInput', function() {
 
       function toMoment(value) {
         var format = null;
-        if (/\d+\/\d+\/\d+/.test(value)) format = 'DD/MM/YYYY';
-        if (/\d+\/\d+\/\d+\s+\d+:\d+/.test(value)) format = 'DD/MM/YYYY HH:mm';
+        if (/\d+\/\d+\/\d+/.test(value)) format = ui.dateFormat;
+        if (/\d+\/\d+\/\d+\s+\d+:\d+/.test(value)) format = ui.dateTimeFormat;
         if (format === null) {
           return moment();
         }
@@ -616,6 +616,10 @@ function FilterFormCtrl($scope, $element, ViewService) {
     }
   });
 
+  $scope.$on('on:apply-filter', function (e, hide) {
+    $scope.applyFilter(hide);
+  });
+
   $scope.$on('on:clear-filter', function (e, options) {
     $scope.clearFilter(options);
   });
@@ -771,6 +775,41 @@ function FilterFormCtrl($scope, $element, ViewService) {
         };
       }
 
+      if (filter.type === 'string' || filter.type === 'text') {
+        if (criterion.operator == "isNull") {
+          criterion = {
+            operator: "or",
+            criteria: [
+                {
+                  fieldName: filter.field,
+                  operator: "isNull"
+                },
+                {
+                  fieldName: filter.field,
+                  operator: "=",
+                  value: ''
+                }
+            ]
+          };
+        }
+        if (criterion.operator == "notNull") {
+          criterion = {
+            operator: "and",
+            criteria: [
+                {
+                  fieldName: filter.field,
+                  operator: "notNull"
+                },
+                {
+                  fieldName: filter.field,
+                  operator: "!=",
+                  value: ''
+                }
+            ]
+          };
+        }
+      }
+
       if (criterion.operator == "between" || criterion.operator == "notBetween") {
         criterion.value2 = filter.value2;
       }
@@ -897,7 +936,7 @@ ui.directive('uiFilterForm', function() {
         "<a href='' ng-click='addFilter()' x-translate>Add filter</a>"+
         "<span class='divider'>|</span>"+
         "<a href='' ng-click='clearFilter(true)' x-translate>Clear</a></li>"+
-        "<span class='divider' ng-if='canExport()'>|</span>"+
+        "<span class='divider'>|</span>"+
         "<a href='' ng-if='canExport()' ng-click='onExport()' x-translate>Export</a></li>"+
         "<span class='divider' ng-if='canExport()'>|</span>"+
         "<a href='' ng-if='canExport(true)' ng-click='onExport(true)' x-translate>Export full</a></li>"+
@@ -1033,7 +1072,11 @@ ui.directive('uiFilterBox', function() {
         if (this.custTerm) {
           return this.onFreeSearch();
         }
-        handler.onRefresh();
+        $scope.$broadcast('on:apply-filter', true);
+      };
+
+      $scope.onReset = function() {
+        $scope.$broadcast('on:clear-filter-silent');
       };
 
       $scope.hasFilters = function(which) {
@@ -1516,6 +1559,7 @@ ui.directive('uiFilterBox', function() {
         "</ul>" +
         "<span class='picker-icons'>" +
         "<i ng-click='onSearch($event)' class='fa fa-caret-down'></i>"+
+        "<i ng-click='onReset()' class='fa fa-eraser'></i>" +
         "<i ng-click='onRefresh()' class='fa fa-search'></i>" +
         "</span>" +
       "</div>" +

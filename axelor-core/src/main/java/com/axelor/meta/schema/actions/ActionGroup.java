@@ -35,6 +35,7 @@ import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -342,14 +343,24 @@ public class ActionGroup extends ActionResumable {
     if (value == null || value instanceof ContextEntity) return;
 
     Object values = value.get("values");
-    Map<String, Object> map = Maps.newHashMap();
+    final Map<String, Object> map;
 
     if (values instanceof ContextEntity) {
       map = ((ContextEntity) values).getContextMap();
     } else if (values instanceof Model) {
       map = Mapper.toMap(value);
     } else if (values instanceof Map) {
-      map = Maps.newHashMap((Map) values);
+      map = new HashMap<>();
+      ((Map<String, Object>) values)
+          .forEach(
+              (key, val) -> {
+                if (key.startsWith("$")) {
+                  key = key.substring(1);
+                }
+                map.put(key, val);
+              });
+    } else {
+      map = new HashMap<>();
     }
 
     values = value.get("attrs");

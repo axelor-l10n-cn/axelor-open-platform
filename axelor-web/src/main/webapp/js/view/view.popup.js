@@ -129,6 +129,28 @@ function EditorCtrl($scope, $element, DataSource, ViewService, $q) {
       if (value && (forceSelect || canOK())) {
         value.$fetched = true;
         value.selected = true;
+
+        // add missing values
+        _.chain(Object.keys(record))
+          .filter(function(name) {
+            return !_.startsWith(name, '$') && _.isObject(record[name]);
+          })
+          .each(function(name) {
+            _.chain(Object.keys(record[name]))
+              .filter(function(subName) {
+                return !_.startsWith(subName, '$')
+                  && subName !== 'version'
+                  && _.isObject(value[name])
+                  && value[name][subName] === undefined;
+              })
+              .each(function(subName) {
+                value[name][subName] = record[name][subName];
+              });
+          });
+        _.chain(value)
+          .filter(function(val) { return val && val.$updatedValues; })
+          .each(function(val) { _.extend(val, val.$updatedValues); });
+
         $scope.$parent.select(value);
       }
       canClose = true;
@@ -319,11 +341,6 @@ ui.directive('uiDialogSize', function() {
         elemTitle.parent().find('i.fa-compress').toggleClass('fa-expand fa-compress');
         elemDialog.removeClass('maximized');
       });
-
-      var params = (scope._viewParams || {}).params || {};
-      if (params['popup.maximized']) {
-        elemButton.click();
-      }
     });
     var addCollapseButton = _.once(function () {
       var elemDialog = element.parent();
@@ -344,9 +361,27 @@ ui.directive('uiDialogSize', function() {
       });
     });
 
+    function doMaximize() {
+      var field = scope.$parent.field || {};
+      var params = (scope._viewParams || {}).params || {};
+
+      var elemDialog = element.parent();
+      var elemButton = elemDialog.find('.ui-dialog-titlebar-max');
+
+      var maximize = params['popup.maximized']
+        || field.popupMaximized === "all"
+        || (field.popupMaximized === "editor" && element.is('[ui-editor-popup]'))
+        || (field.popupMaximized === "selector" && element.is('[ui-selector-popup]'));
+
+      if (maximize) {
+        elemButton.click();
+      }
+    }
+
     function doAdjust() {
       element.dialog('open');
       element.scrollTop(0);
+      setTimeout(doMaximize);
       setTimeout(doFocus);
       if (scope._afterPopupShow) {
         scope._afterPopupShow();

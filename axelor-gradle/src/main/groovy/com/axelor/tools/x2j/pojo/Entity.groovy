@@ -1,7 +1,7 @@
 /*
  * Axelor Business Solutions
  *
- * Copyright (C) 2005-2019 Axelor (<http://axelor.com>).
+ * Copyright (C) 2005-2020 Axelor (<http://axelor.com>).
  *
  * This program is free software: you can redistribute it and/or  modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -59,6 +59,8 @@ class Entity {
 
   boolean dynamicUpdate
 
+  boolean equalsIncludeAll
+
   boolean hashAll
 
   boolean hasExtends
@@ -87,6 +89,8 @@ class Entity {
 
   private String extraImports
 
+  private String removeCode
+
   private String extraCode
 
   private Track track
@@ -105,6 +109,7 @@ class Entity {
     mappedSuper = node.'@persistable' == 'false'
     sequential = !(node.'@sequential' == "false")
     groovy = node.'@lang' == "groovy"
+    equalsIncludeAll = node.'@equalsIncludeAll' == "true"
     hashAll = node.'@hashAll' == "true"
     cacheable = node.'@cacheable'.text().size() > 0 ? node.'@cacheable' : node.'@cachable';
     interfaces = node.'@implements'
@@ -234,6 +239,11 @@ class Entity {
           if (field.name == 'attrs') {
             jsonAttrs = 'false'
           }
+          if (it.name() == 'one-to-one' && field.mappedBy) {
+            removeCode = """\tif (entity.get${field.firstUpper(field.name)}() != null) {
+\t\tentity.get${field.firstUpper(field.name)}().set${field.firstUpper(field.mappedBy)}(null);
+\t}"""
+          }
       }
     }
 
@@ -295,6 +305,7 @@ class Entity {
     other.repository = this.repository
 
     extraImports = stripCode(extraImports, "") + stripCode(other.extraImports, "")
+    removeCode = stripCode(removeCode, "\n\t") + "\n" + stripCode(other.removeCode, "\n\t")
     extraCode = stripCode(extraCode, "\n\t") + "\n" + stripCode(other.extraCode, "\n\t")
   }
 
@@ -392,6 +403,15 @@ class Entity {
     return prefix + Utils.stripCode(code, prefix)
   }
 
+  String getRemoveMethodBody() {
+    return removeCode?.trim() ? stripCode("""
+@Override
+public void remove($name entity) {
+$removeCode
+\tsuper.remove(entity);
+}""", "\n\t") : ""
+  }
+
   String getExtraCode() {
     return stripCode(extraCode, "\n\t");
   }
@@ -399,6 +419,10 @@ class Entity {
   String getExtraImports() {
     if (!extraImports || extraImports.trim().isEmpty()) return "";
     return "\n" + Utils.stripCode(extraImports, "\n") + "\n"
+  }
+
+  private List<Property> getEqualsIncludes() {
+    return properties.findAll { p -> p.equalsInclude }
   }
 
   private List<Property> getHashables() {
@@ -415,7 +439,7 @@ class Entity {
       return "return EntityHelper.equals(this, obj);"
     }
 
-    def hashables = getHashables()
+    def data = getEqualsIncludes()
     def code = [
       "if (obj == null) return false;"
     ]
@@ -433,12 +457,15 @@ class Entity {
     code += "if (this.getId() != null || other.getId() != null) {"
     code += "\treturn Objects.equals(this.getId(), other.getId());"
     code += "}"
-    if (!hashables.empty) {
-      code += ""
-      code += getHashables().collect { p -> "if (!Objects.equals(${p.getter}(), other.${p.getter}())) return false;"}
-    }
     code += ""
-    code += hashables.empty ? "return false;" : "return true;"
+    if (!data.empty) {
+      def conditions = data.collect { p -> "Objects.equals(${p.getter}(), other.${p.getter}())"}
+      def nullConditions = data.collect { p -> "${p.getter}() != null"}
+      conditions += "(${nullConditions.join('\n\t\t\t\t|| ')})"
+      code += "return ${conditions.join('\n\t\t\t&& ')};"
+    } else {
+      code += "return false;"
+    }
     return code.join("\n\t\t")
   }
 
@@ -448,9 +475,8 @@ class Entity {
     }
     importType("java.util.Objects")
     def data = getHashables().collect { "this.${it.getter}()" }.join(", ")
-    if (data.size()) {
-      def hash = name.hashCode()
-      return "return Objects.hash(${hash}, ${data});"
+    if (!data.empty) {
+      return "return Objects.hash(${data});"
     }
     return "return 31;"
   }

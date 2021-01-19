@@ -295,6 +295,7 @@ function BarLayout(items, attrs, $scope, $compile) {
   }
 
   wrap.children('[ui-panel-mail]').appendTo(main);
+  wrap.children('[ui-wkf-status]').prependTo(main);
 
   if (side.children().length > 0) {
     side.appendTo(row.addClass('has-side'));
@@ -565,12 +566,12 @@ ui.directive('uiPanelEditor', ['$compile', 'ActionService', function($compile, A
         return scope.form && scope.form.$valid;
       };
 
-      function isEmpty(record) {
+      function isClean(record) {
         if (!record || _.isEmpty(record)) return true;
         var values = _.filter(record, function (value, name) {
           return !(/[\$_]/.test(name) || value === null || value === undefined);
         });
-        return values.length === 0;
+        return values.length === 0 && !record.$changed;
       }
 
       scope.$watch(function editorValidWatch() {
@@ -578,7 +579,7 @@ ui.directive('uiPanelEditor', ['$compile', 'ActionService', function($compile, A
           return;
         }
         var valid = scope.isValid();
-        if (!valid && !field.jsonFields && !scope.$parent.isRequired() && isEmpty(scope.record)) {
+        if (!valid && !field.jsonFields && !scope.$parent.isRequired() && isClean(scope.record)) {
           var errors = (scope.form || {}).$error || {};
           valid = !errors.valid;
         }

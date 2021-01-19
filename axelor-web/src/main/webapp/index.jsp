@@ -23,6 +23,7 @@
 <%@ page import="com.axelor.app.AvailableAppSettings" %>
 <%@ page import="com.axelor.app.AppSettings" %>
 <%@ page import="com.axelor.web.internal.AppInfo" %>
+<%@ page import="com.axelor.web.internal.StaticResources" %>
 <%@ page import="java.util.ArrayList" %>
 <%@ page import="java.util.List" %>
 <%@ page import="java.util.Locale"%>
@@ -78,6 +79,9 @@ String tenantId = (String) session.getAttribute("tenantId");
 
     <!-- Styles -->
     <x:style src="css/application.css" />
+    <% for (String style : StaticResources.getStyles()) { %>
+    <link href="<%= style %>" rel="stylesheet">
+    <% } %>
     <% if (appTheme != null) { %>
     <link href="css/<%= appTheme %>/theme.css" rel="stylesheet">
     <% } %>
@@ -164,13 +168,14 @@ String tenantId = (String) session.getAttribute("tenantId");
                   	<ul class="dropdown-menu">
                   	<% for (String key : tenantMap.keySet()) { %>
                   	<% if (!key.equals(tenantId)) { %>
-                  	  <li><a href="login.jsp?tenant=<%= key %>"><%= tenantMap.get(key) %></a></li>
+                  	  <li><a href="callback?tenant=<%= key %>"><%= tenantMap.get(key) %></a></li>
                   	<% } %>
                   	<% } %>
                   	</ul>
                   </li>
                   <% } %>
                   <li class="divider"></li>
+                  <li><a href="#" ng-click="showShortcuts()"><span x-translate>Shortcuts</span></a></li>
                   <li><a href="#/about"><span x-translate>About</span></a></li>
                   <li><a href="logout"><span x-translate>Log out</span></a></li>
                 </ul>
@@ -200,6 +205,9 @@ String tenantId = (String) session.getAttribute("tenantId");
     <!-- JavaScript at the bottom for fast page loading -->
     <script src="js/messages.js"></script>
     <x:script src="js/application.js"/>
+    <% for (String script : StaticResources.getScripts()) { %>
+    <script src="<%= script %>"></script>
+    <% } %>
     <% if (extraFoot != null) { %> <jsp:include page="<%= extraFoot %>" /> <% } %>
   </body>
 </html>

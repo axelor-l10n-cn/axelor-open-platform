@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <xsd:schema targetNamespace="http://axelor.com/xml/ns/domain-models"
   xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:dm="http://axelor.com/xml/ns/domain-models"
-  elementFormDefault="qualified" attributeFormDefault="unqualified" version="5.3">
+  elementFormDefault="qualified" attributeFormDefault="unqualified" version="5.4">
 
   <xsd:element name="domain-models">
     <xsd:complexType>
@@ -254,10 +254,17 @@
             </xsd:documentation>
           </xsd:annotation>
         </xsd:attribute>
-        <xsd:attribute name="hashKey" type="xsd:boolean">
+        <xsd:attribute name="equalsInclude" type="xsd:boolean">
           <xsd:annotation>
             <xsd:documentation>
-              If this is not an unique field, whether it can be used to calculate the hashCode.
+              If this is not a unique field, whether it is included in equality test.
+            </xsd:documentation>
+          </xsd:annotation>
+        </xsd:attribute>
+        <xsd:attribute name="hashKey" type="xsd:boolean">
+          <xsd:annotation>
+            <xsd:documentation>(Deprecated: use equalsInclude to use a field in equality test)
+              Whether it can be used to calculate the hashCode.
             </xsd:documentation>
           </xsd:annotation>
         </xsd:attribute>
@@ -1020,9 +1027,17 @@
         </xsd:documentation>
       </xsd:annotation>
     </xsd:attribute>
-    <xsd:attribute name="hashAll" type="xsd:boolean">
+    <xsd:attribute name="equalsIncludeAll" type="xsd:boolean">
       <xsd:annotation>
         <xsd:documentation>
+        Whether to include all the simple non-function fields in equality test.
+        You can still ignore some fields with equalsInclude="false" attribute.
+        </xsd:documentation>
+      </xsd:annotation>
+    </xsd:attribute>
+    <xsd:attribute name="hashAll" type="xsd:boolean">
+      <xsd:annotation>
+        <xsd:documentation>(Deprecated: use equalsIncludeAll to include all keys in equality test)
         Whether to use all the simple non-function fields as hash keys.
         You can still ignore some fields with hashKey="false" attribute.
         </xsd:documentation>

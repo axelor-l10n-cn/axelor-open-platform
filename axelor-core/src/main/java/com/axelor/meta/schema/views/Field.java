@@ -25,6 +25,7 @@ import com.axelor.meta.MetaStore;
 import com.fasterxml.jackson.annotation.JsonGetter;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.annotation.JsonSetter;
 import com.fasterxml.jackson.annotation.JsonTypeName;
 import java.util.Collection;
 import java.util.List;
@@ -167,14 +168,22 @@ public class Field extends SimpleWidget {
   @XmlAttribute(name = "x-search-limit")
   private Integer searchLimit;
 
+  @XmlAttribute(name = "x-color-field")
+  private String colorField;
+
   @XmlAttribute(name = "x-accept")
   private String accept;
+
+  @XmlAttribute(name = "x-popup-maximized")
+  private String popupMaximized;
 
   @XmlAttribute(name = "x-json-model")
   private String jsonModel;
 
   @XmlElement(name = "hilite")
   private List<Hilite> hilites;
+
+  @XmlElement private ToolTip tooltip;
 
   @XmlElements({
     @XmlElement(name = "form", type = FormView.class),
@@ -200,6 +209,7 @@ public class Field extends SimpleWidget {
     return placeholder;
   }
 
+  @JsonSetter
   public void setPlaceholder(String placeholder) {
     this.placeholder = placeholder;
   }
@@ -536,12 +546,28 @@ public class Field extends SimpleWidget {
     this.searchLimit = searchLimit;
   }
 
+  public String getColorField() {
+    return colorField;
+  }
+
+  public void setColorField(String colorField) {
+    this.colorField = colorField;
+  }
+
   public String getAccept() {
     return accept;
   }
 
   public void setAccept(String accept) {
     this.accept = accept;
+  }
+
+  public String getPopupMaximized() {
+    return popupMaximized;
+  }
+
+  public void setPopupMaximized(String popupMaximized) {
+    this.popupMaximized = popupMaximized;
   }
 
   public String getJsonModel() {
@@ -558,6 +584,14 @@ public class Field extends SimpleWidget {
 
   public void setHilites(List<Hilite> hilites) {
     this.hilites = hilites;
+  }
+
+  public ToolTip getTooltip() {
+    return tooltip;
+  }
+
+  public void setTooltip(ToolTip tooltip) {
+    this.tooltip = tooltip;
   }
 
   public List<AbstractView> getViews() {

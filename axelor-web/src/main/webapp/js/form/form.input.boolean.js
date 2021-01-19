@@ -33,9 +33,21 @@ ui.formInput('Boolean', {
   link: function (scope, element, attrs, model) {
 
     element.on('click', 'input:not(.no-toggle)', function (e) {
-      var value = $(e.target).data('value');
-      var checked = value === undefined ? e.target.checked : value;
-      scope.setValue(checked, true);
+      var doClick = function () {
+        var value = $(e.target).data('value');
+        var checked = value === undefined ? e.target.checked : value;
+        if (scope.field.nullable && value === model.$viewValue ) {
+          $(e.target).prop('checked', false);
+          checked = null;
+        }
+        scope.setValue(checked, true);
+      };
+
+      if (scope.waitForActions) {
+        scope.waitForActions(doClick);
+      } else {
+        doClick();
+      }
     });
 
     Object.defineProperty(scope, '$value', {
@@ -200,9 +212,12 @@ ui.formInput('BooleanRadio', 'BooleanSelect', {
     ).appendTo(element);
 
     scope.$render_editable = function () {
-      var value = model.$viewValue || false;
-      var input = value ? trueInput : falseInput;
-      input.prop('checked', true);
+      var value = scope.field.nullable ? model.$viewValue : model.$viewValue || false;
+      if (value) {
+        trueInput.prop('checked', true);
+      } else if (value == false) {
+        falseInput.prop('checked', true);
+      }
     };
 
     element.on('change', 'input', function (e) {

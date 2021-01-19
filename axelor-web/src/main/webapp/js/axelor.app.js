@@ -477,6 +477,57 @@
       });
     };
 
+    $scope.showShortcuts = function () {
+      var content = $("<table class='keyboard-shortcuts'>");
+      var shortcuts = [
+        [[_t('Ctrl'), _t('Insert')], _t('create new record')],
+        [[_t('Ctrl'), 'E'], _t('edit selected record')],
+        [[_t('Ctrl'), 'S'], _t('save current record')],
+        [[_t('Ctrl'), 'D'], _t('delete current/selected record(s)')],
+        [[_t('Ctrl'), 'R'], _t('refresh current view')],
+        [[_t('Ctrl'), 'Q'], _t('close the current view tab')],
+        [[_t('Alt'), 'F'], _t('search for records')],
+        [[_t('Alt'), 'G'], _t('focus first or selected item in view')],
+        [[_t('Ctrl'), 'J'], _t('navigate to previous page/record')],
+        [[_t('Ctrl'), 'K'], _t('navigate to next page/record')],
+        [[_t('Ctrl'), 'M'], _t('focus left menu search box')],
+        [['F9'], _t('toggle left menu')],
+      ];
+
+      shortcuts.forEach(function (item) {
+        var keys = item[0];
+        var text = item[1];
+
+        var d1 = $("<td class='keys'>").appendTo(content);
+        var d2 = $("<td>").appendTo(content).append(text);
+
+        keys.forEach(function (x, i) {
+          $("<kbd>").text(x).appendTo(d1);
+          if (i < keys.length - 1) {
+            d1.append(" + ");
+          }
+        });
+
+        $("<tr>").append(d1).append(d2).appendTo(content);
+      });
+
+      axelor.dialogs.box(content, {
+        title: _t("Keyboard Shortcuts")
+      });
+    };
+
+    axelor.$openHtmlTab = function (url, title) {
+      $scope.openTab({
+        title: title || url,
+        action: "$act" + new Date().getTime(),
+        viewType: "html",
+        views: [{
+          type: "html",
+          resource: url
+        }]
+      });
+    };
+
     var loginAttempts = 0;
     var loginWindow = null;
     var errorWindow = null;
