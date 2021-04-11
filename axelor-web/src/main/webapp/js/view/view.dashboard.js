@@ -1,7 +1,7 @@
 /*
  * Axelor Business Solutions
  *
- * Copyright (C) 2005-2020 Axelor (<http://axelor.com>).
+ * Copyright (C) 2005-2021 Axelor (<http://axelor.com>).
  *
  * This program is free software: you can redistribute it and/or  modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -138,6 +138,9 @@ ui.directive('uiViewDashboard', ['ViewService', function(ViewService) {
 
 DashletCtrl.$inject = ['$scope', '$element', 'MenuService', 'DataSource', 'ViewService'];
 function DashletCtrl($scope, $element, MenuService, DataSource, ViewService) {
+
+  $scope.toolbar = null;
+  $scope.menubar = null;
 
   var self = this;
   var init = _.once(function init() {
@@ -332,7 +335,7 @@ ui.directive('uiViewDashlet', ['$compile', function($compile){
           "<div class='dashlet-search' ng-if='showSearch'>" +
             "<div ui-filter-box x-handler='this'></div>" +
           "</div>" +
-          "<div ui-nested-grid-actions></div>" +
+          "<div ui-nested-grid-actions ng-if='field.showBars'></div>" +
           "<div class='dashlet-title'><span ui-help-popover>{{title}}</span></div>" +
         "</div>" +
         "<div class='dashlet-body'></div>" +

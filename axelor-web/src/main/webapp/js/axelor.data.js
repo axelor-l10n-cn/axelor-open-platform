@@ -1,7 +1,7 @@
 /*
  * Axelor Business Solutions
  *
- * Copyright (C) 2005-2020 Axelor (<http://axelor.com>).
+ * Copyright (C) 2005-2021 Axelor (<http://axelor.com>).
  *
  * This program is free software: you can redistribute it and/or  modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -249,6 +249,19 @@
           }
         }
 
+        function transform(item) {
+          if (_.isArray(item)) return _.map(item, transform);
+          if (_.isArray(item.criteria)) {
+            item.criteria = transform(item.criteria);
+            return item;
+          }
+          if (item.transformer) {
+            item.transformer(item);
+            delete item.transformer;
+          }
+          return item;
+        }
+
         var opts = _.extend({
           store: true
         }, options);
@@ -285,7 +298,11 @@
           _domainContext: context,
           _domainAction: action || undefined,
           _archived: archived
-        }, filter);
+        }, angular.copy(filter));
+
+        if (query.criteria) {
+          transform(query.criteria);
+        }
 
         var that = this,
           page = this._page,

@@ -1,7 +1,7 @@
 /*
  * Axelor Business Solutions
  *
- * Copyright (C) 2005-2020 Axelor (<http://axelor.com>).
+ * Copyright (C) 2005-2021 Axelor (<http://axelor.com>).
  *
  * This program is free software: you can redistribute it and/or  modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -412,7 +412,7 @@ ui.directive('uiDialogSize', function() {
 
       //XXX: ui-dialog issue
       element.find('.slick-headerrow-column,.slickgrid,[ui-embedded-editor]').zIndex(element.zIndex());
-      element.find('.record-toolbar .btn').zIndex(element.zIndex()+1);
+      element.find('.record-toolbar .btn, .dropdown').zIndex(element.zIndex()+1);
     }
 
     // a flag used by evalScope to detect popup (see form.base.js)

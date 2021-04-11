@@ -1,7 +1,7 @@
 /*
  * Axelor Business Solutions
  *
- * Copyright (C) 2005-2020 Axelor (<http://axelor.com>).
+ * Copyright (C) 2005-2021 Axelor (<http://axelor.com>).
  *
  * This program is free software: you can redistribute it and/or  modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -784,7 +784,7 @@ var panelRelatedTemplate =
 "<div class='panel panel-related' ng-class='{noEdit: canView() && !canEdit()}'>" +
   "<div class='panel-header'>" +
     "<div class='panel-title'><span ui-help-popover ng-bind-html='title'></span></div>" +
-    "<div ui-nested-grid-actions></div>" +
+    "<div ui-nested-grid-actions ng-if='field.showBars'></div>" +
     "<div class='icons-bar' ng-show='!isReadonly()'>" +
       "<a href='' ng-click='onSelect()' ng-show='hasPermission(\"read\") && canShowIcon(\"select\") && !isDisabled() && canSelect()'>" +
         "<i class='fa fa-search'></i><span x-translate>Select</span>" +

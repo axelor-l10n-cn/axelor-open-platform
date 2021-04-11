@@ -1,7 +1,7 @@
 /*
  * Axelor Business Solutions
  *
- * Copyright (C) 2005-2020 Axelor (<http://axelor.com>).
+ * Copyright (C) 2005-2021 Axelor (<http://axelor.com>).
  *
  * This program is free software: you can redistribute it and/or  modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -135,7 +135,8 @@ var Formatters = {
   },
 
   "duration": function(field, value) {
-    return ui.formatDuration(field, value);
+    var attrs = _.extend({}, field, field.widgetAttrs);
+    return ui.formatDuration(attrs, value);
   },
 
   "date": function(field, value) {
@@ -172,7 +173,7 @@ var Formatters = {
 
     var text = (value||{})[key];
 
-    return text ? _.escapeHTML(text) : "";
+    return text ? _.escapeHTML(axelor.sanitize(text)) : "";
   },
 
   "one-to-many": function(field, value) {
@@ -323,10 +324,24 @@ var Formatters = {
     });
 
     return items.join(' &bull; ');
+  },
+
+  "phone": function (field, value) {
+    return value ? '<a href="tel:' + value + '">' + value + '</a>' : '';
   }
 };
 
 Formatters.text = Formatters.string;
+
+var GroupFormatters = {
+  "one-to-one": function(field, value, record) {
+    return GroupFormatters['many-to-one'](field, value, record);
+  },
+
+  "many-to-one": function(field, value, record) {
+    return Formatters['many-to-one'](field, value, record) + '<span class="hidden">' + (value || {}).id + '</span>';
+  }
+};
 
 function totalsFormatter(totals, columnDef) {
 
@@ -338,7 +353,14 @@ function totalsFormatter(totals, columnDef) {
   var vals = totals[field.aggregate || 'sum'] || {};
   var val = vals[field.name];
 
-  var formatter = Formatters[field.type];
+  var type = field.type;
+  var widget = field.widget;
+
+  if (["duration"].indexOf(widget) >= 0) {
+    type = widget;
+  }
+
+  var formatter = Formatters[type];
   if (formatter) {
     return formatter(field, val);
   }
@@ -395,7 +417,7 @@ _.extend(Factory.prototype, {
       return Formatters[type](field, value, dataContext, this.grid);
     }
 
-    if (["url", "duration"].indexOf(widget) > 0) {
+    if (["url", "duration", "phone"].indexOf(widget) >= 0) {
       type = widget.toLowerCase();
     }
 
@@ -1978,7 +2000,7 @@ Grid.prototype.adjustEditor = function () {
       left = false;
       setTimeout(function () {
         if (activeCell.cell === n) {
-          widget.find('input,:focusable').first().focus().select();
+          widget.find('input,:focusable:not(".secondary-focus")').first().focus().select();
         }
       }, 100)
     } else if (left) {
@@ -2603,7 +2625,8 @@ Grid.prototype.groupBy = function(names) {
     return {
       getter: function(item) {
         var value = item[name];
-        var formatter = Formatters[field.selection ? 'selection' : field.type];
+        var type = field.selection ? 'selection' : field.type;
+        var formatter = GroupFormatters[type] || Formatters[type];
         if (field.jsonPath && field.jsonField) {
           var jsonValue = item[field.jsonField];
           if (jsonValue) {

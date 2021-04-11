@@ -1,7 +1,7 @@
 /*
  * Axelor Business Solutions
  *
- * Copyright (C) 2005-2020 Axelor (<http://axelor.com>).
+ * Copyright (C) 2005-2021 Axelor (<http://axelor.com>).
  *
  * This program is free software: you can redistribute it and/or  modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -105,7 +105,11 @@ public class MetaService {
   @Inject private ActionExecutor actionExecutor;
 
   private boolean canShow(
-      MenuItem item, Map<String, MenuItem> map, Set<String> visited, ScriptHelper helper) {
+      MenuItem item,
+      Map<String, MenuItem> map,
+      Set<String> visited,
+      ScriptHelper helper,
+      Boolean withParentCheck) {
     if (visited == null) {
       visited = new HashSet<>();
     }
@@ -117,14 +121,17 @@ public class MetaService {
     if (item.getHidden() == Boolean.TRUE || !test(item, helper)) {
       return false;
     }
-    if (item.getParent() == null) {
+    if (item.getParent() == null || !withParentCheck) {
       return true;
     }
     final MenuItem parent = map.get(item.getParent());
     if (parent == null) {
+      // At this point, if the parent is not present in the map,
+      // we consider that he is hidden, so the child can be shown.
       return false;
     }
-    return canShow(parent, map, visited, helper);
+    // Recursively check for the parents visibilities
+    return canShow(parent, map, visited, helper, true);
   }
 
   private boolean test(MenuItem item, ScriptHelper helper) {
@@ -139,10 +146,16 @@ public class MetaService {
     return helper.test(condition);
   }
 
-  private List<MenuItem> filter(Collection<MenuItem> items) {
+  /**
+   * Filters list of <code>MenuItem</code>
+   *
+   * @param items the list to filter
+   * @param withParentCheck whether to exclude child menus if related parent is excluded
+   * @return new list of <code>MenuItem</code> filtered.
+   */
+  private List<MenuItem> filter(Collection<MenuItem> items, Boolean withParentCheck) {
 
-    final Map<String, MenuItem> map = new LinkedHashMap<>();
-    final Set<String> visited = new HashSet<>();
+    final Map<String, MenuItem> visited = new LinkedHashMap<>();
     final List<MenuItem> all = new ArrayList<>();
 
     final Map<String, Object> vars = new HashMap<>();
@@ -150,18 +163,15 @@ public class MetaService {
 
     for (MenuItem item : items) {
       final String name = item.getName();
-      if (visited.contains(name)) {
+      if (visited.containsKey(name)) {
         continue;
       }
-      visited.add(name);
-      if (item.getHidden() != Boolean.TRUE) {
-        map.put(name, item);
-      }
+      visited.put(name, item);
     }
 
-    for (final String name : map.keySet()) {
-      final MenuItem item = map.get(name);
-      if (canShow(item, map, null, scriptHelper)) {
+    for (final String name : visited.keySet()) {
+      final MenuItem item = visited.get(name);
+      if (canShow(item, visited, null, scriptHelper, withParentCheck)) {
         all.add(item);
       }
     }
@@ -425,7 +435,7 @@ public class MetaService {
       menus.put(item, menu);
     }
 
-    final List<MenuItem> items = filter(menus.keySet());
+    final List<MenuItem> items = filter(menus.keySet(), true);
     items.forEach(item -> item.setTag(getTag(menus.get(item))));
 
     return items;
@@ -484,7 +494,7 @@ public class MetaService {
       menus.add(item);
     }
 
-    return filter(menus);
+    return filter(menus, false);
   }
 
   public Action getAction(String name) {

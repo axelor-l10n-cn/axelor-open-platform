@@ -1,7 +1,7 @@
 /*
  * Axelor Business Solutions
  *
- * Copyright (C) 2005-2020 Axelor (<http://axelor.com>).
+ * Copyright (C) 2005-2021 Axelor (<http://axelor.com>).
  *
  * This program is free software: you can redistribute it and/or  modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -468,6 +468,8 @@ angular.module('axelor.ui').directive('uiViewCalendar', ['ViewService', 'ActionS
 
       lang: lang,
 
+      firstDay: mini.datepicker('option', 'firstDay'),
+
       editable: editable,
 
       selectable: editable,
@@ -529,7 +531,6 @@ angular.module('axelor.ui').directive('uiViewCalendar', ['ViewService', 'ActionS
       _.extend(options, {
         timeFormat: 'H:mm',
         axisFormat: 'H:mm',
-        firstDay: 1,
 
         views: {
           week: {

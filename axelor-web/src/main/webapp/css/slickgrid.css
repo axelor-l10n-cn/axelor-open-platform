@@ -1,7 +1,7 @@
 /**
  * Axelor Business Solutions
  *
- * Copyright (C) 2005-2020 Axelor (<http://axelor.com>).
+ * Copyright (C) 2005-2021 Axelor (<http://axelor.com>).
  *
  * This program is free software: you can redistribute it and/or  modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -649,6 +649,14 @@
   width: auto;
 }
 
+.slick-editor .form-item-container.time-item > input.ui-mask {
+  text-align: right;
+}
+
+.slick-editor .form-item-container.phone-item .phone-validation {
+  display: none;
+}
+
 .slick-editor input,
 .slick-editor textarea {
   border-color: #ddd;
@@ -685,4 +693,8 @@
   border-bottom-left-radius: 0;
   border-bottom-right-radius: 0;
   box-shadow: 1px -1px 2px rgba(0, 0, 0, 0.2);
+}
+
+.slick-form .iti__flag-container {
+  border: 1px solid #ddd;
 }
